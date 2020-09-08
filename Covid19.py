@@ -30,6 +30,8 @@ class Covid19Manager():
         If add_aggregate is True, the aggregation values at Catalunya level are added as new rows of the Dataframe
         """
 
+        # TODO: fix bug with days with 0 cases
+
         if mode == 'comarques':
 
             # check if today's file already exists
@@ -50,6 +52,9 @@ class Covid19Manager():
                 # parse date correctly
                 catdata_cases['Date'] = pd.to_datetime(catdata_cases.TipusCasData, format='%d/%m/%Y')
                 catdata_cases = catdata_cases.drop(columns = ['TipusCasData'])
+
+                # remove character '\xa0' from Areas
+                catdata_cases['Area'] = catdata_cases.Area.str.replace('\xa0', '')
 
                 print('Read data from Catalunya: {} registers from {} to {}'.format(len(catdata_cases), min(catdata_cases.Date), max(catdata_cases.Date)))
 
@@ -236,7 +241,7 @@ class Covid19Manager():
                 )
             ],
             yaxis=dict(
-                range=(data.epg.min(), data.epg.max() * 1.2)
+                range=(data.epg.min() if data.epg.min() < 0 else 0, data.epg.max() * 1.2)
             )
         )
 
@@ -246,7 +251,6 @@ class Covid19Manager():
             return fig
         elif mode == 'json':
             return json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
-
 
     def plot_ia14_rho(self):
         """TBD"""
@@ -258,17 +262,16 @@ if __name__ == '__main__':
     cat_data = cov19.get_catalunya_confirmed(mode='comarques')
     cat_pop = cov19.get_catalunya_population(mode='comarques')
 
-    area = 'Barcelonès'
+    area = 'Moianès'
     data = cat_data[cat_data.Area == area].reset_index(drop = True)
     data['Confirmed_rollingmean'] = cov19.compute_rolling_mean(data, 'Confirmed', rolling_n=7)
     data['epg'] = cov19.compute_epg(data, 'Confirmed', cat_pop[area])
 
-    cov19.plot_daily_values(mode='show', data=data, title='Daily Confirmed {}'.format(area), column_date='Date',
-                            column_value='Confirmed', name_value='Confirmed', color_value='lightskyblue',
-                            column_rolling='Confirmed_rollingmean', name_rolling='Mean {} days'.format(7), color_rolling='royalblue')
-    cov19.plot_epg(mode='show', data=data, title='Effective Potential Growth (EPG) {}'.format(area), column_date='Date')
+    print(data.tail(10)[['Area', 'Date', 'epg']])
+
+    # cov19.plot_daily_values(mode='show', data=data, title='Daily Confirmed {}'.format(area), column_date='Date',
+    #                         column_value='Confirmed', name_value='Confirmed', color_value='lightskyblue',
+    #                         column_rolling='Confirmed_rollingmean', name_rolling='Mean {} days'.format(7), color_rolling='royalblue')
+    # cov19.plot_epg(mode='show', data=data, title='Effective Potential Growth (EPG) {}'.format(area), column_date='Date')
 
     exit()
-    # cov19.GetGreeceConfirmed(mode='periferies')
-    # cov19.GetGreecePopulation(mode='periferies')
-    
