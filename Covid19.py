@@ -129,7 +129,40 @@ class Covid19Manager():
 
         # TODO: read greece data from online sources
 
-        data = pd.DataFrame()
+        if mode == 'periferies':
+
+            # check if today's file already exists
+            today_filename = 'data/greece_confirmed_{}_v{}.csv'.format(mode, datetime.today().strftime('%Y%m%d'))
+            if os.path.exists(today_filename):
+                # read and return the file if it already exists
+                data = pd.read_csv(today_filename, sep=',')
+            else:
+                # otherwise read and process from online source
+                greece_cases_raw = pd.read_csv('https://raw.githubusercontent.com/iMEdD-Lab/open-data/master/COVID-19/regions_greece_cases.csv')
+
+                # unpivot dataframe
+                gre_data = pd.melt(greece_cases_raw.drop(columns=['district_EN', 'pop_11']),
+                                   id_vars=['district'], var_name='date', value_name='total_confirmed')
+
+                # rename columns
+                gre_data = gre_data.rename(columns={'district': 'Area'})
+
+                # format Date
+                gre_data['Date'] = pd.to_datetime(gre_data['date'], format='%m/%d/%y')
+
+                # compute daily confirmed
+                gre_data['Confirmed'] = gre_data.total_confirmed - gre_data.groupby('Area').total_confirmed.shift(1)
+
+                # remove columns
+                data = gre_data.drop(columns=['date', 'total_confirmed'])
+
+                # store result into csv
+                data.to_csv(today_filename, sep=',', index=False, header=True)
+                print('File {} stored'.format(today_filename))
+
+        else:
+            # return an empty dataframe
+            data = pd.DataFrame()
 
         return data
 
@@ -140,6 +173,22 @@ class Covid19Manager():
 
         if mode == 'periferies':
             # TODO: add greece population
+
+            'Άγιον Όρος': 1811,
+            'Περιφέρεια Ανατολικής Μακεδονίας Θράκης': 608182,
+            'Περιφέρεια Αττικής': 3753783,
+            'Περιφέρεια Βορείου Αιγαίου': 199231,
+            'Περιφέρεια Δυτικής Ελλάδας': 679796,
+            'Περιφέρεια Δυτικής Μακεδονίας': 283689,
+            'Περιφέρεια Ηπείρου ': 336856,
+            'Περιφέρεια Θεσσαλίας': 732762,
+            'Περιφέρεια Ιονίων Νήσων': 207855,
+            'Περιφέρεια Κεντρικής Μακεδονίας': 1882108,
+            'Περιφέρεια Κρήτης': 623065,
+            'Περιφέρεια Νοτίου Αιγαίου': 309015,
+            'Περιφέρεια Πελοποννήσου': 577903,
+            'Περιφέρεια Στερεάς Ελλάδας και Εύβοιας': 547390
+
             pop = pd.DataFrame()
         
         else:
@@ -269,16 +318,19 @@ class Covid19Manager():
 if __name__ == '__main__':
 
     cov19 = Covid19Manager()
-    cat_data = cov19.get_catalunya_confirmed(mode='comarques')
-    cat_pop = cov19.get_catalunya_population(mode='comarques')
 
-    area = 'Catalunya'
-    data = cat_data[cat_data.Area == area].reset_index(drop = True)
-    data['Confirmed_rollingmean'] = cov19.compute_rolling_mean(data, 'Confirmed', rolling_n=7)
-    data['epg'] = cov19.compute_epg(data, 'Confirmed', cat_pop[area])
+    gre_data = cov19.get_greece_confirmed(mode='periferies')
 
-    print(data.tail(10)[['Area', 'Date', 'epg']])
-
+    # cat_data = cov19.get_catalunya_confirmed(mode='comarques')
+    # cat_pop = cov19.get_catalunya_population(mode='comarques')
+    #
+    # area = 'Bages'
+    # data = cat_data[cat_data.Area == area].reset_index(drop = True)
+    # data['Confirmed_rollingmean'] = cov19.compute_rolling_mean(data, 'Confirmed', rolling_n=7)
+    # data['epg'] = cov19.compute_epg(data, 'Confirmed', cat_pop[area])
+    #
+    # print(data.tail(10)[['Area', 'Date', 'epg']])
+    #
     # cov19.plot_daily_values(mode='show', data=data, title='Daily Confirmed {}'.format(area), column_date='Date',
     #                         column_value='Confirmed', name_value='Confirmed', color_value='lightskyblue',
     #                         column_rolling='Confirmed_rollingmean', name_rolling='Mean {} days'.format(7), color_rolling='royalblue')
