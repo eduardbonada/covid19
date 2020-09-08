@@ -8,6 +8,7 @@ Copyright 2020
 import pandas as pd
 import os
 from datetime import datetime
+import plotly.graph_objects as go
 
 class Covid19Manager():
     """
@@ -26,9 +27,6 @@ class Covid19Manager():
         Read Catalunya data, aggregate it according to 'mode' and return a Dataframe with [Date, Area, Confirmed].
         If add_aggregate is True, the aggregation values at Catalunya level are added as new rows of the Dataframe
         """
-
-        # TODO: store downloaded file
-        # TODO: check existing today's file and avoid downloading
 
         if mode == 'comarques':
 
@@ -112,7 +110,7 @@ class Covid19Manager():
         If add_aggregate is True, the aggregation values at Catalunya level are added
         """
 
-        # TODO: read data from online sources
+        # TODO: read greece data from online sources
 
         data = pd.DataFrame()
 
@@ -124,7 +122,7 @@ class Covid19Manager():
         """ 
 
         if mode == 'periferies':
-            # TODO: read from online csv
+            # TODO: add greece population
             pop = pd.DataFrame()
         
         else:
@@ -156,8 +154,41 @@ class Covid19Manager():
         data['epg'] = data.rho_7 * data.ia_14
         
         return data.epg.drop(columns=['rho_A', 'rho_B'])
-    
-    
+
+    def plot_daily_values(self, data, title, column_date,
+                          column_value, name_value, color_value,
+                          show_rolling=True, column_rolling=None, name_rolling=None, color_rolling=None):
+        """TBD"""
+
+        # TODO: either plot or return object
+
+        # add bar plot with daily values to data to plot
+        data_plot = [
+            go.Bar(
+                name=name_value,
+                x=data[column_date], y=data[column_value],
+                marker_color=color_value
+            )]
+        if show_rolling:
+            data_plot.append(go.Scatter(name=name_rolling,
+                                        x=data[column_date], y=data[column_rolling],
+                                        marker_color=color_rolling))
+
+        # plot daily cases
+        go.Figure(data=data_plot).update_layout(
+            title=title,
+            legend=dict(orientation='h', yanchor="top", y=0.98, xanchor="right", x=0.99),
+            yaxis=dict( range=(data[column_value], data[column_value] * 1.2) )
+        ).show()
+
+    def plot_epg(self):
+        """TBD"""
+        # TODO: plot epg
+
+    def plot_ia14_rho(self):
+        """TBD"""
+        # TODO: plot ia14 vs rho
+
 if __name__ == '__main__':
 
     cov19 = Covid19Manager()
@@ -166,8 +197,18 @@ if __name__ == '__main__':
 
     area = 'Barcelonès'
     data = cat_data[cat_data.Area == area].reset_index(drop = True)
-    cat_roll = cov19.compute_rolling_mean(data, 'Confirmed', rolling_n=14)
-    cat_epg = cov19.compute_epg(data, 'Confirmed', cat_pop[area])
+    data['Confirmed_rollingmean'] = cov19.compute_rolling_mean(data, 'Confirmed', rolling_n=7)
+    data['epg'] = cov19.compute_epg(data, 'Confirmed', cat_pop[area])
+
+    cov19.plot_daily_values(data, title='Daily Confirmed {}'.format(area), column_date='Date',
+               column_value='Confirmed', name_value='Confirmed', color_value='lightskyblue',
+               column_rolling='Confirmed_rollingmean', name_rolling='Mean {} days'.format(7), color_rolling='royalblue'
+               )
+    cov19.plot_daily_values(data, title='Daily Confirmed {}'.format(area), column_date='Date',
+               column_value='Confirmed', name_value='Confirmed', color_value='lightskyblue',
+               show_rolling=False
+               )
+
     exit()
     # cov19.GetGreeceConfirmed(mode='periferies')
     # cov19.GetGreecePopulation(mode='periferies')
