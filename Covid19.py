@@ -8,7 +8,9 @@ Copyright 2020
 import pandas as pd
 import os
 from datetime import datetime
+import plotly
 import plotly.graph_objects as go
+import json
 
 class Covid19Manager():
     """
@@ -155,31 +157,44 @@ class Covid19Manager():
         
         return data.epg.drop(columns=['rho_A', 'rho_B'])
 
-    def plot_daily_values(self, data, title, column_date,
+    def plot_daily_values(self, mode, data, title, column_date,
                           column_value, name_value, color_value,
                           show_rolling=True, column_rolling=None, name_rolling=None, color_rolling=None):
-        """TBD"""
+        """
+        Creates the plot with daily values and either shows it or returns
+        - mode: indicates the type of return ('show', 'object', 'json')
+        - data: dataframe with data to plot
+        - show_rolling: boolean indicating whether to plot the rolling mean line or not
+        - the rest of variables are used to configure what to plot and how to visualize
+        """
 
-        # TODO: either plot or return object
-
-        # add bar plot with daily values to data to plot
+        # add bar plot with daily values
         data_plot = [
             go.Bar(
                 name=name_value,
                 x=data[column_date], y=data[column_value],
                 marker_color=color_value
             )]
+
+        # add rolling
         if show_rolling:
             data_plot.append(go.Scatter(name=name_rolling,
                                         x=data[column_date], y=data[column_rolling],
                                         marker_color=color_rolling))
 
         # plot daily cases
-        go.Figure(data=data_plot).update_layout(
+        fig = go.Figure(data=data_plot).update_layout(
             title=title,
             legend=dict(orientation='h', yanchor="top", y=0.98, xanchor="right", x=0.99),
             yaxis=dict( range=(data[column_value], data[column_value] * 1.2) )
-        ).show()
+        )
+
+        if mode == 'show':
+            fig.show()
+        elif mode == 'object':
+            return fig
+        elif mode == 'json':
+            return json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
 
     def plot_epg(self):
         """TBD"""
@@ -200,14 +215,12 @@ if __name__ == '__main__':
     data['Confirmed_rollingmean'] = cov19.compute_rolling_mean(data, 'Confirmed', rolling_n=7)
     data['epg'] = cov19.compute_epg(data, 'Confirmed', cat_pop[area])
 
-    cov19.plot_daily_values(data, title='Daily Confirmed {}'.format(area), column_date='Date',
-               column_value='Confirmed', name_value='Confirmed', color_value='lightskyblue',
-               column_rolling='Confirmed_rollingmean', name_rolling='Mean {} days'.format(7), color_rolling='royalblue'
-               )
-    cov19.plot_daily_values(data, title='Daily Confirmed {}'.format(area), column_date='Date',
-               column_value='Confirmed', name_value='Confirmed', color_value='lightskyblue',
-               show_rolling=False
-               )
+    cov19.plot_daily_values(mode='show', data=data, title='Daily Confirmed {}'.format(area), column_date='Date',
+                            column_value='Confirmed', name_value='Confirmed', color_value='lightskyblue',
+                            column_rolling='Confirmed_rollingmean', name_rolling='Mean {} days'.format(7), color_rolling='royalblue')
+    print(cov19.plot_daily_values(data=data, mode='json', title='Daily Confirmed {}'.format(area), column_date='Date',
+                                  column_value='Confirmed', name_value='Confirmed', color_value='lightskyblue',
+                                  show_rolling=False))
 
     exit()
     # cov19.GetGreeceConfirmed(mode='periferies')
