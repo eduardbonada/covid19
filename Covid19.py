@@ -196,9 +196,57 @@ class Covid19Manager():
         elif mode == 'json':
             return json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
 
-    def plot_epg(self):
-        """TBD"""
-        # TODO: plot epg
+    def plot_epg(self, mode, data, title, column_date):
+        """
+        Creates the plot with epg values
+        - mode: indicates the type of return ('show', 'object', 'json')
+        - data: dataframe with data to plot
+        - the rest of variables are used to configure what to plot and how to visualize
+        """
+
+        # create plot
+        fig = go.Figure(data=[
+            go.Scatter(
+                name='EPG',
+                x=data[column_date], y=data.epg,
+                marker_color='darkslategray'
+            )
+        ]).update_layout(
+            title=title,
+            shapes=[
+                dict(
+                    # add green area: low risk epg<30
+                    type="rect", xref="x", yref="y", x0="2020-01-01", y0=0, x1="2020-12-31", y1=30,
+                    fillcolor="palegreen", opacity=0.5, layer="below", line_width=0
+                ),
+                dict(
+                    # add yellow area: moderate risk 30<epg<70
+                    type="rect", xref="x", yref="y", x0="2020-01-01", y0=30, x1="2020-12-31", y1=70,
+                    fillcolor="yellow", opacity=0.4, layer="below", line_width=0
+                ),
+                dict(
+                    # add orange area: high risk 70<epg<100
+                    type="rect", xref="x", yref="y", x0="2020-01-01", y0=70, x1="2020-12-31", y1=100,
+                    fillcolor="orange", opacity=0.4, layer="below", line_width=0
+                ),
+                dict(
+                    # add red area: very high risk 100<epg
+                    type="rect", xref="x", yref="y", x0="2020-01-01", y0=100, x1="2020-12-31", y1=10000,
+                    fillcolor="red", opacity=0.5, layer="below", line_width=0
+                )
+            ],
+            yaxis=dict(
+                range=(data.epg.min(), data.epg.max() * 1.2)
+            )
+        )
+
+        if mode == 'show':
+            fig.show()
+        elif mode == 'object':
+            return fig
+        elif mode == 'json':
+            return json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
+
 
     def plot_ia14_rho(self):
         """TBD"""
@@ -218,9 +266,7 @@ if __name__ == '__main__':
     cov19.plot_daily_values(mode='show', data=data, title='Daily Confirmed {}'.format(area), column_date='Date',
                             column_value='Confirmed', name_value='Confirmed', color_value='lightskyblue',
                             column_rolling='Confirmed_rollingmean', name_rolling='Mean {} days'.format(7), color_rolling='royalblue')
-    print(cov19.plot_daily_values(data=data, mode='json', title='Daily Confirmed {}'.format(area), column_date='Date',
-                                  column_value='Confirmed', name_value='Confirmed', color_value='lightskyblue',
-                                  show_rolling=False))
+    cov19.plot_epg(mode='show', data=data, title='Effective Potential Growth (EPG) {}'.format(area), column_date='Date')
 
     exit()
     # cov19.GetGreeceConfirmed(mode='periferies')
