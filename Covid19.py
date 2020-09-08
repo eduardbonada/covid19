@@ -80,6 +80,32 @@ class Covid19Manager():
 
         return data
 
+    def get_catalunya_population(self, mode):
+        """
+        Returns a dict with the population of Catalunya depending on 'mode'
+        """
+
+        if mode == 'comarques':
+            pop = {"Alt Camp": 44424, "Alt Empordà": 137951, "Alt Penedès": 108339, "Alt Urgell": 20155,
+                   "Alta Ribagorça": 3820, "Anoia": 120842, "Aran": 9971, "Bages": 176891, "Baix Camp": 192245,
+                   "Baix Ebre": 77199, "Baix Empordà": 132284, "Baix Llobregat": 818883, "Baix Penedès": 104473,
+                   "Barcelonès": 2264301, "Berguedà": 39274, "Cerdanya": 18061, "Conca de Barberà": 19852,
+                   "Garraf": 147635, "Garrigues": 18880, "Garrotxa": 56467, "Gironès": 188504, "Maresme": 446872,
+                   "Moianès": 13483, "Montsià": 68297, "Noguera": 38226, "Osona": 158758, "Pallars Jussà": 12914,
+                   "Pallars Sobirà": 6896, "Pla d'Urgell": 37035, "Pla de l'Estany": 32085, "Priorat": 9180,
+                   "Ribera d'Ebre": 21610, "Ripollès": 24917, "Segarra": 22617, "Segrià": 206129, "Selva": 168469,
+                   "Solsonès": 13639, "Tarragonès": 257454, "Terra Alta": 11352, "Urgell": 36462,
+                   "Vallès Occidental": 923976, "Vallès Oriental": 408672, "Catalunya": 7619494, "Metropolità": 4866555,
+                   "Comarques Gironines": 740677, "Camp de Tarragona": 523155, "Terres de l'Ebre": 178458,
+                   "Ponent": 359349, "Comarques Centrals": 403480, "Alt Pirineu i Aran": 71817, "Penedès": 476003,
+                   "Barcelona": 5627752, "Girona": 755396, "Lleida": 430255, "Tarragona": 806091}
+
+        else:
+            # return an empty dict
+            pop = {}
+
+        return pop
+
     def get_greece_confirmed(self, mode, add_aggregate=True):
         """
         Read Greece data, aggregate it according to 'mode' and return a Dataframe with [Date, Area, Confirmed]. 
@@ -91,25 +117,6 @@ class Covid19Manager():
         data = pd.DataFrame()
 
         return data
-
-    def get_catalunya_population(self, mode):
-        """
-        Returns a dict with the population of Catalunya depending on 'mode'
-        """
-
-        # TODO: add population data from all comarques
-
-        if mode == 'comarques':
-            pop = {
-                'Catalunya': 7565099,
-                'Barcelonès': 2220000
-            }
-        
-        else:
-            # return an empty datafresame
-            pop = {}
-        
-        return pop
 
     def get_greece_population(self, mode):
         """
@@ -155,8 +162,13 @@ if __name__ == '__main__':
 
     cov19 = Covid19Manager()
     cat_data = cov19.get_catalunya_confirmed(mode='comarques')
+    cat_pop = cov19.get_catalunya_population(mode='comarques')
+
+    area = 'Barcelonès'
+    data = cat_data[cat_data.Area == area].reset_index(drop = True)
+    cat_roll = cov19.compute_rolling_mean(data, 'Confirmed', rolling_n=14)
+    cat_epg = cov19.compute_epg(data, 'Confirmed', cat_pop[area])
     exit()
-    # cov19.GetCatalunyaPopulation(mode='comarques')
     # cov19.GetGreeceConfirmed(mode='periferies')
     # cov19.GetGreecePopulation(mode='periferies')
     
