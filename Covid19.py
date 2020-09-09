@@ -12,6 +12,17 @@ import plotly
 import plotly.graph_objects as go
 import json
 
+# TODO: Test computing rollingmean centered at 'today'
+# TODO: Compute epg and rolling of all areas together in the same dataframe
+# TODO: Create plot ia14-rho7
+# TODO: Add perfieries names in english
+# TODO: Keep data in Covid19 class object
+# TODO: Create Dashboard
+# TODO: Read deaths data
+# TODO: Implement other plots (log cumul cases, etc, ...)
+# TODO: Add world data
+
+
 class Covid19Manager():
     """
     Object that contains actions and processes related to Covid19 data sources
@@ -29,8 +40,6 @@ class Covid19Manager():
         Read Catalunya data, aggregate it according to 'mode' and return a Dataframe with [Date, Area, Confirmed].
         If add_aggregate is True, the aggregation values at Catalunya level are added as new rows of the Dataframe
         """
-
-        # TODO: fix bug with days with 0 cases
 
         if mode == 'comarques':
 
@@ -127,8 +136,6 @@ class Covid19Manager():
         If add_aggregate is True, the aggregation values at Catalunya level are added
         """
 
-        # TODO: read greece data from online sources
-
         if mode == 'periferies':
 
             # check if today's file already exists
@@ -141,22 +148,29 @@ class Covid19Manager():
                 greece_cases_raw = pd.read_csv('https://raw.githubusercontent.com/iMEdD-Lab/open-data/master/COVID-19/regions_greece_cases.csv')
 
                 # unpivot dataframe
-                gre_data = pd.melt(greece_cases_raw.drop(columns=['district_EN', 'pop_11']),
+                gre_cases = pd.melt(greece_cases_raw.drop(columns=['district_EN', 'pop_11']),
                                    id_vars=['district'], var_name='date', value_name='total_confirmed')
 
                 # rename columns
-                gre_data = gre_data.rename(columns={'district': 'Area'})
+                gre_cases = gre_cases.rename(columns={'district': 'Area'})
 
                 # format Date
-                gre_data['Date'] = pd.to_datetime(gre_data['date'], format='%m/%d/%y')
+                gre_cases['Date'] = pd.to_datetime(gre_cases['date'], format='%m/%d/%y')
 
                 # compute daily confirmed
-                gre_data['Confirmed'] = gre_data.total_confirmed - gre_data.groupby('Area').total_confirmed.shift(1)
+                gre_cases['Confirmed'] = gre_cases.total_confirmed - gre_cases.groupby('Area').total_confirmed.shift(1)
 
                 # remove columns
-                data = gre_data.drop(columns=['date', 'total_confirmed'])
+                gre_cases = gre_cases.drop(columns=['date', 'total_confirmed'])
+
+                # add greece as area
+                if add_aggregate:
+                    gre_cases_total = gre_cases.groupby('Date').agg({'Confirmed': 'sum'}).reset_index()
+                    gre_cases_total['Area'] = 'Ελλάδα'
+                    gre_cases = gre_cases.append(gre_cases_total).reset_index(drop=True)
 
                 # store result into csv
+                data = gre_cases
                 data.to_csv(today_filename, sep=',', index=False, header=True)
                 print('File {} stored'.format(today_filename))
 
@@ -172,29 +186,28 @@ class Covid19Manager():
         """ 
 
         if mode == 'periferies':
-            # TODO: add greece population
+            pop = {
+                    'Άγιον Όρος': 1811,
+                    'Περιφέρεια Ανατολικής Μακεδονίας Θράκης': 608182,
+                    'Περιφέρεια Αττικής': 3753783,
+                    'Περιφέρεια Βορείου Αιγαίου': 199231,
+                    'Περιφέρεια Δυτικής Ελλάδας': 679796,
+                    'Περιφέρεια Δυτικής Μακεδονίας': 283689,
+                    'Περιφέρεια Ηπείρου': 336856,
+                    'Περιφέρεια Θεσσαλίας': 732762,
+                    'Περιφέρεια Ιονίων Νήσων': 207855,
+                    'Περιφέρεια Κεντρικής Μακεδονίας': 1882108,
+                    'Περιφέρεια Κρήτης': 623065,
+                    'Περιφέρεια Νοτίου Αιγαίου': 309015,
+                    'Περιφέρεια Πελοποννήσου': 577903,
+                    'Περιφέρεια Στερεάς Ελλάδας και Εύβοιας': 547390,
+                    'Ελλάδα': 10413243
+            }
 
-            'Άγιον Όρος': 1811,
-            'Περιφέρεια Ανατολικής Μακεδονίας Θράκης': 608182,
-            'Περιφέρεια Αττικής': 3753783,
-            'Περιφέρεια Βορείου Αιγαίου': 199231,
-            'Περιφέρεια Δυτικής Ελλάδας': 679796,
-            'Περιφέρεια Δυτικής Μακεδονίας': 283689,
-            'Περιφέρεια Ηπείρου ': 336856,
-            'Περιφέρεια Θεσσαλίας': 732762,
-            'Περιφέρεια Ιονίων Νήσων': 207855,
-            'Περιφέρεια Κεντρικής Μακεδονίας': 1882108,
-            'Περιφέρεια Κρήτης': 623065,
-            'Περιφέρεια Νοτίου Αιγαίου': 309015,
-            'Περιφέρεια Πελοποννήσου': 577903,
-            'Περιφέρεια Στερεάς Ελλάδας και Εύβοιας': 547390
-
-            pop = pd.DataFrame()
-        
         else:
-            # return an empty datafresame
-            pop = pd.DataFrame()
-        
+            # return an empty dict
+            pop = {}
+
         return pop
 
     def compute_rolling_mean(self, data, column, rolling_n=7):
@@ -313,14 +326,21 @@ class Covid19Manager():
 
     def plot_ia14_rho(self):
         """TBD"""
-        # TODO: plot ia14 vs rho
 
 if __name__ == '__main__':
 
     cov19 = Covid19Manager()
 
+    # greece
     gre_data = cov19.get_greece_confirmed(mode='periferies')
+    gre_pop = cov19.get_greece_population(mode='periferies')
 
+    area = 'Ελλάδα'  # 'Περιφέρεια Ηπείρου'
+    data = gre_data[gre_data.Area == area].reset_index(drop=True)
+    data['Confirmed_rollingmean'] = cov19.compute_rolling_mean(data, 'Confirmed', rolling_n=7)
+    data['epg'] = cov19.compute_epg(data, 'Confirmed', gre_pop[area])
+
+    # catalunya
     # cat_data = cov19.get_catalunya_confirmed(mode='comarques')
     # cat_pop = cov19.get_catalunya_population(mode='comarques')
     #
@@ -328,12 +348,11 @@ if __name__ == '__main__':
     # data = cat_data[cat_data.Area == area].reset_index(drop = True)
     # data['Confirmed_rollingmean'] = cov19.compute_rolling_mean(data, 'Confirmed', rolling_n=7)
     # data['epg'] = cov19.compute_epg(data, 'Confirmed', cat_pop[area])
-    #
-    # print(data.tail(10)[['Area', 'Date', 'epg']])
-    #
-    # cov19.plot_daily_values(mode='show', data=data, title='Daily Confirmed {}'.format(area), column_date='Date',
-    #                         column_value='Confirmed', name_value='Confirmed', color_value='lightskyblue',
-    #                         column_rolling='Confirmed_rollingmean', name_rolling='Mean {} days'.format(7), color_rolling='royalblue')
-    # cov19.plot_epg(mode='show', data=data, title='Effective Potential Growth (EPG) {}'.format(area), column_date='Date')
+
+    # plots
+    cov19.plot_daily_values(mode='show', data=data, title='Daily Confirmed {}'.format(area), column_date='Date',
+                            column_value='Confirmed', name_value='Confirmed', color_value='lightskyblue',
+                            column_rolling='Confirmed_rollingmean', name_rolling='Mean {} days'.format(7), color_rolling='royalblue')
+    cov19.plot_epg(mode='show', data=data, title='Effective Potential Growth (EPG) {}'.format(area), column_date='Date')
 
     exit()
