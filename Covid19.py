@@ -12,16 +12,15 @@ import plotly
 import plotly.graph_objects as go
 import json
 
-# TODO: Test computing rollingmean centered at 'today'
+# TODO: List or plot with cases per region last days (bar plot with regions as colors? only top-N regions?)
 # TODO: Compute epg and rolling of all areas together in the same dataframe
 # TODO: Create plot ia14-rho7
-# TODO: Add perfieries names in english
+# TODO: Add perfieries names in english?
 # TODO: Keep data in Covid19 class object
 # TODO: Create Dashboard
 # TODO: Read deaths data
 # TODO: Implement other plots (log cumul cases, etc, ...)
 # TODO: Add world data
-
 
 class Covid19Manager():
     """
@@ -214,6 +213,10 @@ class Covid19Manager():
         """Returns the rolling mean with a 'rolling_n' window  of 'column' in 'data'"""
         return data[column].rolling(rolling_n).mean().reset_index(0, drop=True)
 
+    def compute_rolling_sum(self, data, column, rolling_n=14):
+        """Returns the rolling sum with a 'rolling_n' window  of 'column' in 'data'"""
+        return data[column].rolling(rolling_n).sum().reset_index(0, drop=True)
+
     def compute_epg(self, data, column, population):
         """Returns the EPG (Effective Potential Growth) of 'data' where 'column' is the column with daily confirmed values.
         EPG as described in LINK? """
@@ -232,38 +235,39 @@ class Covid19Manager():
         # compute index of potential growth (EPG)
         data['epg'] = data.rho_7 * data.ia_14
         
-        return data.epg.drop(columns=['rho_A', 'rho_B'])
+        return data.epg.drop(columns=['rho_A', 'rho_B']).fillna(0)
 
-    def plot_daily_values(self, mode, data, title, column_date,
-                          column_value, name_value, color_value,
-                          show_rolling=True, column_rolling=None, name_rolling=None, color_rolling=None):
+    def plot_daily_values_v2(self, mode, data, title, column_date, plots):
         """
-        Creates the plot with daily values and either shows it or returns
+        Creates the plot with daily values and either shows it or returns the requested type of object
         - mode: indicates the type of return ('show', 'object', 'json')
         - data: dataframe with data to plot
-        - show_rolling: boolean indicating whether to plot the rolling mean line or not
-        - the rest of variables are used to configure what to plot and how to visualize
+        - title: title of the plot
+        - column_date: column including the dates of the x-axis
+        - plots: array of dicts describing which plots to include
         """
 
-        # add bar plot with daily values
-        data_plot = [
-            go.Bar(
-                name=name_value,
-                x=data[column_date], y=data[column_value],
-                marker_color=color_value
-            )]
+        # add plots to plot
+        data_plot = []
+        for p in plots:
+            if p['type'] == 'bar':
+                data_plot.append(go.Bar(
+                    name=p['name_value'],
+                    x=data[column_date], y=data[p['column_value']],
+                    marker_color=p['color_value']
+                ))
+            elif p['type'] == 'line':
+                data_plot.append(go.Scatter(
+                    name=p['name_value'],
+                    x=data[column_date], y=data[p['column_value']],
+                    marker_color=p['color_value']
+                ))
 
-        # add rolling
-        if show_rolling:
-            data_plot.append(go.Scatter(name=name_rolling,
-                                        x=data[column_date], y=data[column_rolling],
-                                        marker_color=color_rolling))
-
-        # plot daily cases
+        # plot daily data
         fig = go.Figure(data=data_plot).update_layout(
             title=title,
             legend=dict(orientation='h', yanchor="top", y=0.98, xanchor="right", x=0.99),
-            yaxis=dict( range=(data[column_value], data[column_value] * 1.2) )
+            yaxis=dict( range=(data[p['column_value']], data[p['column_value']] * 1.2) )
         )
 
         if mode == 'show':
@@ -335,9 +339,10 @@ if __name__ == '__main__':
     gre_data = cov19.get_greece_confirmed(mode='periferies')
     gre_pop = cov19.get_greece_population(mode='periferies')
 
-    area = 'Ελλάδα'  # 'Περιφέρεια Ηπείρου'
+    area = 'Περιφέρεια Ηπείρου'  # 'Περιφέρεια Ηπείρου' 'Ελλάδα' 'Περιφέρεια Κεντρικής Μακεδονίας'
     data = gre_data[gre_data.Area == area].reset_index(drop=True)
     data['Confirmed_rollingmean'] = cov19.compute_rolling_mean(data, 'Confirmed', rolling_n=7)
+    data['Confirmed_rollingsum'] = cov19.compute_rolling_sum(data, 'Confirmed', rolling_n=14)
     data['epg'] = cov19.compute_epg(data, 'Confirmed', gre_pop[area])
 
     # catalunya
@@ -347,12 +352,34 @@ if __name__ == '__main__':
     # area = 'Bages'
     # data = cat_data[cat_data.Area == area].reset_index(drop = True)
     # data['Confirmed_rollingmean'] = cov19.compute_rolling_mean(data, 'Confirmed', rolling_n=7)
+    # data['Confirmed_rollingsum'] = cov19.compute_rolling_sum(data, 'Confirmed', rolling_n=14)
     # data['epg'] = cov19.compute_epg(data, 'Confirmed', cat_pop[area])
 
     # plots
-    cov19.plot_daily_values(mode='show', data=data, title='Daily Confirmed {}'.format(area), column_date='Date',
-                            column_value='Confirmed', name_value='Confirmed', color_value='lightskyblue',
-                            column_rolling='Confirmed_rollingmean', name_rolling='Mean {} days'.format(7), color_rolling='royalblue')
+    cov19.plot_daily_values_v2(mode='show', data=data, title='Daily Confirmed {}'.format(area), column_date='Date',
+                               plots=[
+                                   {
+                                       'type': 'bar',
+                                       'column_value': 'Confirmed',
+                                       'name_value': 'Confirmed',
+                                       'color_value': 'lightskyblue'
+                                    },
+                                    {
+                                       'type': 'line',
+                                       'column_value': 'Confirmed_rollingmean',
+                                       'name_value': 'Mean {} days'.format(7),
+                                       'color_value': 'royalblue'
+                                    }
+                               ])
+    cov19.plot_daily_values_v2(mode='show', data=data, title='Active Confirmed {}'.format(area), column_date='Date',
+                               plots=[
+                                   {
+                                       'type': 'line',
+                                       'column_value': 'Confirmed_rollingsum',
+                                       'name_value': 'Sum {} days'.format(14),
+                                       'color_value': 'royalblue'
+                                   }
+                               ])
     cov19.plot_epg(mode='show', data=data, title='Effective Potential Growth (EPG) {}'.format(area), column_date='Date')
 
     exit()
