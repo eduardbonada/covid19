@@ -12,9 +12,9 @@ import plotly
 import plotly.graph_objects as go
 import json
 
+# TODO: Compute epg of all areas together in the same dataframe
+# TODO: Plot ia14-rho7: add parameter to show only some values (1 of every N) to smooth the plot
 # TODO: List or plot with cases per region last days (bar plot with regions as colors? only top-N regions?)
-# TODO: Compute epg and rolling of all areas together in the same dataframe
-# TODO: Create plot ia14-rho7
 # TODO: Add perfieries names in english?
 # TODO: Keep data in Covid19 class object
 # TODO: Create Dashboard
@@ -209,13 +209,13 @@ class Covid19Manager():
 
         return pop
 
-    def compute_rolling_mean(self, data, column, rolling_n=7):
-        """Returns the rolling mean with a 'rolling_n' window  of 'column' in 'data'"""
-        return data[column].rolling(rolling_n).mean().reset_index(0, drop=True)
+    def compute_rolling_mean(self, data, value_column, groupby_column, rolling_n=7):
+        """Returns the rolling mean with a 'rolling_n' window  of 'value_column' in 'data' grouping by column 'groupby_column'"""
+        return data.groupby(groupby_column)[value_column].rolling(rolling_n).mean().reset_index(0, drop=True)
 
-    def compute_rolling_sum(self, data, column, rolling_n=14):
-        """Returns the rolling sum with a 'rolling_n' window  of 'column' in 'data'"""
-        return data[column].rolling(rolling_n).sum().reset_index(0, drop=True)
+    def compute_rolling_sum(self, data, value_column, groupby_column, rolling_n=14):
+        """Returns the rolling sum with a 'rolling_n' window  of 'value_column' in 'data' grouping by column 'groupby_column'"""
+        return data.groupby(groupby_column)[value_column].rolling(rolling_n).sum().reset_index(0, drop=True)
 
     def compute_epg(self, data, column, population):
         """Returns the EPG (Effective Potential Growth) of 'data' where 'column' is the column with daily confirmed values.
@@ -225,7 +225,7 @@ class Covid19Manager():
         # rho = rho_A / rho_B = (n + n-1 + n-2) / (n-5 + n-6 + n-7) (rho_7 is the average of the last 7 days)
         data['rho_A'] = data[column].rolling(min_periods=1, window=3).sum()
         data['rho_B'] = data[column].shift(5).rolling(min_periods=1, window=3).sum()
-        data['rho'] = data.rho_A / data.rho_B
+        data['rho'] = data.apply(lambda d: d.rho_A / d.rho_B if (d.rho_B != 0 and not pd.isnull(d.rho_B)) else 0.0, axis=1)  # data.rho_A / data.rho_B if data.rho_B != 0 else 0.0
         data['rho_7'] = data.rho.rolling(7).mean().reset_index(0, drop=True)
 
         # compute number of potentially infectious people
@@ -328,58 +328,93 @@ class Covid19Manager():
         elif mode == 'json':
             return json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
 
-    def plot_ia14_rho(self):
-        """TBD"""
+    def plot_ia14_rho(self, mode, data, title):
+        """
+        Creates the plot of ia14 vs rho_7
+        - mode: indicates the type of return ('show', 'object', 'json')
+        - data: dataframe with data to plot
+        - the rest of variables are used to configure what to plot and how to visualize
+        """
+
+        # create plot
+        fig = go.Figure(data=[
+            go.Scatter(
+                name='IA_14 vs RHO_7',
+                x=data.ia_14, y=data.rho_7,
+                marker_color='darkslategray'
+            )
+        ]).update_layout(
+            title=title,
+            width=800, height=800
+        )
+
+        if mode == 'show':
+            fig.show()
+        elif mode == 'object':
+            return fig
+        elif mode == 'json':
+            return json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
+
 
 if __name__ == '__main__':
 
+    start_date = '2020-08-01 00:00:00'
+    end_date = '2020-12-31 00:00:00'
+
     cov19 = Covid19Manager()
 
-    # greece
+    # read greece data
     gre_data = cov19.get_greece_confirmed(mode='periferies')
     gre_pop = cov19.get_greece_population(mode='periferies')
 
-    area = 'Περιφέρεια Ηπείρου'  # 'Περιφέρεια Ηπείρου' 'Ελλάδα' 'Περιφέρεια Κεντρικής Μακεδονίας'
-    data = gre_data[gre_data.Area == area].reset_index(drop=True)
-    data['Confirmed_rollingmean'] = cov19.compute_rolling_mean(data, 'Confirmed', rolling_n=7)
-    data['Confirmed_rollingsum'] = cov19.compute_rolling_sum(data, 'Confirmed', rolling_n=14)
-    data['epg'] = cov19.compute_epg(data, 'Confirmed', gre_pop[area])
+    # compute additional measures
+    gre_data['Confirmed_rollingmean'] = cov19.compute_rolling_mean(data=gre_data, value_column='Confirmed', groupby_column='Area', rolling_n=7)
+    gre_data['Confirmed_rollingsum'] = cov19.compute_rolling_sum(data=gre_data, value_column='Confirmed', groupby_column='Area', rolling_n=14)
+    gre_data['epg'] = cov19.compute_epg(gre_data, 'Confirmed', gre_pop[area])
+
+    # select period
+    data = gre_data[(gre_data.Date >= start_date) & (gre_data.Date <= end_date)].sort_values('Date').reset_index(drop=True)
+
+    # select area
+    area = 'Ελλάδα'  # 'Περιφέρεια Ηπείρου' 'Ελλάδα' 'Περιφέρεια Κεντρικής Μακεδονίας'
+    area_data = data[data.Area == area].reset_index(drop=True)
 
     # catalunya
     # cat_data = cov19.get_catalunya_confirmed(mode='comarques')
     # cat_pop = cov19.get_catalunya_population(mode='comarques')
     #
-    # area = 'Bages'
+    # area = 'Barcelonès'
     # data = cat_data[cat_data.Area == area].reset_index(drop = True)
     # data['Confirmed_rollingmean'] = cov19.compute_rolling_mean(data, 'Confirmed', rolling_n=7)
     # data['Confirmed_rollingsum'] = cov19.compute_rolling_sum(data, 'Confirmed', rolling_n=14)
     # data['epg'] = cov19.compute_epg(data, 'Confirmed', cat_pop[area])
 
     # plots
-    cov19.plot_daily_values_v2(mode='show', data=data, title='Daily Confirmed {}'.format(area), column_date='Date',
-                               plots=[
-                                   {
-                                       'type': 'bar',
-                                       'column_value': 'Confirmed',
-                                       'name_value': 'Confirmed',
-                                       'color_value': 'lightskyblue'
-                                    },
-                                    {
-                                       'type': 'line',
-                                       'column_value': 'Confirmed_rollingmean',
-                                       'name_value': 'Mean {} days'.format(7),
-                                       'color_value': 'royalblue'
-                                    }
-                               ])
-    cov19.plot_daily_values_v2(mode='show', data=data, title='Active Confirmed {}'.format(area), column_date='Date',
-                               plots=[
-                                   {
-                                       'type': 'line',
-                                       'column_value': 'Confirmed_rollingsum',
-                                       'name_value': 'Sum {} days'.format(14),
-                                       'color_value': 'royalblue'
-                                   }
-                               ])
-    cov19.plot_epg(mode='show', data=data, title='Effective Potential Growth (EPG) {}'.format(area), column_date='Date')
+    # cov19.plot_daily_values_v2(mode='show', data=data, title='Daily Confirmed {}'.format(area), column_date='Date',
+    #                            plots=[
+    #                                {
+    #                                    'type': 'bar',
+    #                                    'column_value': 'Confirmed',
+    #                                    'name_value': 'Confirmed',
+    #                                    'color_value': 'lightskyblue'
+    #                                 },
+    #                                 {
+    #                                    'type': 'line',
+    #                                    'column_value': 'Confirmed_rollingmean',
+    #                                    'name_value': 'Mean {} days'.format(7),
+    #                                    'color_value': 'royalblue'
+    #                                 }
+    #                            ])
+    # cov19.plot_daily_values_v2(mode='show', data=data, title='Active Confirmed {}'.format(area), column_date='Date',
+    #                            plots=[
+    #                                {
+    #                                    'type': 'line',
+    #                                    'column_value': 'Confirmed_rollingsum',
+    #                                    'name_value': 'Sum {} days'.format(14),
+    #                                    'color_value': 'royalblue'
+    #                                }
+    #                            ])
+    # cov19.plot_epg(mode='show', data=data, title='Effective Potential Growth (EPG) {}'.format(area), column_date='Date')
+    cov19.plot_ia14_rho(mode='show', data=data, title='IA_14 vs RHO_7 {}'.format(area))
 
     exit()
