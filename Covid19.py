@@ -250,12 +250,14 @@ class Covid19Manager():
         # compute ratio of infected people per infected person
         # rho = rho_A / rho_B = (n + n-1 + n-2) / (n-5 + n-6 + n-7) (rho_7 is the average of the last 7 days)
         data['rho_A'] = data.groupby(area_column)[confirmed_column].rolling(window=3, min_periods=1).sum().reset_index(0, drop=True)
-        data['rho_B'] = data.groupby(area_column)[confirmed_column].shift(5).rolling(window=3, min_periods=1).sum().reset_index(0, drop=True)
+        # data['rho_B'] = data.groupby(area_column)[confirmed_column].shift(5).rolling(window=3, min_periods=1).sum().reset_index(0, drop=True)
+        data['rho_B'] = data.groupby(area_column).shift(5).rho_A # rho_B is actually equal  to rho_A of 5 days earlier
         data['rho'] = data.apply(lambda d: d.rho_A / d.rho_B if (d.rho_B != 0 and not pd.isnull(d.rho_B)) else 0.0, axis=1)  # data.rho_A / data.rho_B if data.rho_B != 0 else 0.0
         data['rho_7'] = data.groupby(area_column).rho.rolling(window=7, min_periods=1).mean().reset_index(0, drop=True)
 
         # compute number of potentially infectious people
         # ia_14 = sum of confirmed during last 14 days / 100.000 inhabitants
+        # TODO: how to deal with the population of the grouped area? merge original data and add population in each row?
         data['ia_14'] = data[confirmed_column].rolling(window=14, min_periods=1).sum().reset_index(0, drop=True) / (population/100000)
 
         # compute index of potential growth (EPG)
@@ -389,8 +391,8 @@ if __name__ == '__main__':
 
     cov19 = Covid19Manager()
 
-    mode = 'greece_v1'
-    plots = ['daily_confirmed'] #'daily_confirmed', 'active_confirmed', 'epg', 'ia_rho']
+    mode = 'greece_v2'
+    plots = ['epg'] #'daily_confirmed', 'active_confirmed', 'epg', 'ia_rho']
 
     if mode == 'greece_v1':
         # read greece data
@@ -418,6 +420,7 @@ if __name__ == '__main__':
         # compute additional measures
         gre_data['Confirmed_rollingmean'] = cov19.compute_rolling_mean(data=gre_data, value_column='Confirmed', groupby_column='Area', rolling_n=7)
         gre_data['Confirmed_rollingsum'] = cov19.compute_rolling_sum(data=gre_data, value_column='Confirmed', groupby_column='Area', rolling_n=14)
+        gre_data['epg'] = cov19.compute_epg_v2(data=gre_data, confirmed_column='Confirmed', area_column='Area', population=None)
 
         # select period
         data = gre_data[(gre_data.Date >= start_date) & (gre_data.Date <= end_date)].sort_values('Date').reset_index(drop=True)
@@ -425,8 +428,6 @@ if __name__ == '__main__':
         # select area
         area = 'Ελλάδα'  # 'Περιφέρεια Ηπείρου' 'Ελλάδα' 'Περιφέρεια Κεντρικής Μακεδονίας'
         area_data = data[data.Area == area].reset_index(drop=True)
-
-        area_data['epg'] = cov19.compute_epg(data=area_data, confirmed_column='Confirmed', population=gre_pop[area])
 
     if mode == 'cat':
         # read greece data
