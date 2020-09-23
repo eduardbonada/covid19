@@ -211,11 +211,11 @@ class Covid19Manager():
 
     def compute_rolling_mean(self, data, value_column, groupby_column, rolling_n=7):
         """Returns the rolling mean with a 'rolling_n' window  of 'value_column' in 'data' grouping by column 'groupby_column'"""
-        return data.groupby(groupby_column)[value_column].rolling(rolling_n).mean().reset_index(0, drop=True)
+        return data.groupby(groupby_column)[value_column].rolling(window=rolling_n, min_periods=1).mean().reset_index(0, drop=True)
 
     def compute_rolling_sum(self, data, value_column, groupby_column, rolling_n=14):
         """Returns the rolling sum with a 'rolling_n' window  of 'value_column' in 'data' grouping by column 'groupby_column'"""
-        return data.groupby(groupby_column)[value_column].rolling(rolling_n).sum().reset_index(0, drop=True)
+        return data.groupby(groupby_column)[value_column].rolling(window=rolling_n, min_periods=1).sum().reset_index(0, drop=True)
 
     def compute_epg(self, data, column, population):
         """Returns the EPG (Effective Potential Growth) of 'data' where 'column' is the column with daily confirmed values.
@@ -226,7 +226,7 @@ class Covid19Manager():
         data['rho_A'] = data[column].rolling(min_periods=1, window=3).sum()
         data['rho_B'] = data[column].shift(5).rolling(min_periods=1, window=3).sum()
         data['rho'] = data.apply(lambda d: d.rho_A / d.rho_B if (d.rho_B != 0 and not pd.isnull(d.rho_B)) else 0.0, axis=1)  # data.rho_A / data.rho_B if data.rho_B != 0 else 0.0
-        data['rho_7'] = data.rho.rolling(7).mean().reset_index(0, drop=True)
+        data['rho_7'] = data.rho.rolling(window=7, min_periods=1).mean().reset_index(0, drop=True)
 
         # compute number of potentially infectious people
         # ia_14 = sum of confirmed during last 14 days / 100.000 inhabitants
