@@ -101,7 +101,7 @@ class Covid19Manager():
             # return an empty dataframe
             data = pd.DataFrame()
 
-        return data
+        return data.sort_values(['Area', 'Date']).reset_index(drop=True)
 
     def get_catalunya_population(self, mode):
         """
@@ -177,7 +177,7 @@ class Covid19Manager():
             # return an empty dataframe
             data = pd.DataFrame()
 
-        return data
+        return data.sort_values(['Area', 'Date']).reset_index(drop=True)
 
     def get_greece_population(self, mode):
         """
