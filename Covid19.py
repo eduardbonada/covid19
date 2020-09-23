@@ -217,27 +217,53 @@ class Covid19Manager():
         """Returns the rolling sum with a 'rolling_n' window  of 'value_column' in 'data' grouping by column 'groupby_column'"""
         return data.groupby(groupby_column)[value_column].rolling(window=rolling_n, min_periods=1).sum().reset_index(0, drop=True)
 
-    def compute_epg(self, data, column, population):
-        """Returns the EPG (Effective Potential Growth) of 'data' where 'column' is the column with daily confirmed values.
+    def compute_epg(self, data, confirmed_column, population):
+        """Returns the EPG (Effective Potential Growth) of 'data' where 'confirmed_column' is the column with daily confirmed values
+        It assumes a single area is passed in data
         EPG as described in LINK? """
+
+        # loop groupby(area)'s and perform calculation
 
         # compute ratio of infected people per infected person
         # rho = rho_A / rho_B = (n + n-1 + n-2) / (n-5 + n-6 + n-7) (rho_7 is the average of the last 7 days)
-        data['rho_A'] = data[column].rolling(min_periods=1, window=3).sum()
-        data['rho_B'] = data[column].shift(5).rolling(min_periods=1, window=3).sum()
+        data['rho_A'] = data[confirmed_column].rolling(window=3, min_periods=1).sum()
+        data['rho_B'] = data[confirmed_column].shift(5).rolling(window=3, min_periods=1).sum()
         data['rho'] = data.apply(lambda d: d.rho_A / d.rho_B if (d.rho_B != 0 and not pd.isnull(d.rho_B)) else 0.0, axis=1)  # data.rho_A / data.rho_B if data.rho_B != 0 else 0.0
         data['rho_7'] = data.rho.rolling(window=7, min_periods=1).mean().reset_index(0, drop=True)
 
         # compute number of potentially infectious people
         # ia_14 = sum of confirmed during last 14 days / 100.000 inhabitants
-        data['ia_14'] = data[column].rolling(14).sum() / (population/100000)
+        data['ia_14'] = data[confirmed_column].rolling(window=14, min_periods=1).sum() / (population / 100000)
+
+        # compute index of potential growth (EPG)
+        data['epg'] = data.rho_7 * data.ia_14
+
+        return data.epg.drop(columns=['rho_A', 'rho_B']).fillna(0)
+
+    def compute_epg_v2(self, data, confirmed_column, area_column, population):
+        """Returns the EPG (Effective Potential Growth) of 'data' where 'confirmed_column' is the column with daily confirmed values and .
+        'area_column' is the column with the areas.
+        EPG as described in LINK? """
+
+        # loop groupby(area)'s and perform calculation
+
+        # compute ratio of infected people per infected person
+        # rho = rho_A / rho_B = (n + n-1 + n-2) / (n-5 + n-6 + n-7) (rho_7 is the average of the last 7 days)
+        data['rho_A'] = data.groupby(area_column)[confirmed_column].rolling(window=3, min_periods=1).sum().reset_index(0, drop=True)
+        data['rho_B'] = data.groupby(area_column)[confirmed_column].shift(5).rolling(window=3, min_periods=1).sum().reset_index(0, drop=True)
+        data['rho'] = data.apply(lambda d: d.rho_A / d.rho_B if (d.rho_B != 0 and not pd.isnull(d.rho_B)) else 0.0, axis=1)  # data.rho_A / data.rho_B if data.rho_B != 0 else 0.0
+        data['rho_7'] = data.groupby(area_column).rho.rolling(window=7, min_periods=1).mean().reset_index(0, drop=True)
+
+        # compute number of potentially infectious people
+        # ia_14 = sum of confirmed during last 14 days / 100.000 inhabitants
+        data['ia_14'] = data[confirmed_column].rolling(window=14, min_periods=1).sum().reset_index(0, drop=True) / (population/100000)
 
         # compute index of potential growth (EPG)
         data['epg'] = data.rho_7 * data.ia_14
         
         return data.epg.drop(columns=['rho_A', 'rho_B']).fillna(0)
 
-    def plot_daily_values_v2(self, mode, data, title, column_date, plots):
+    def plot_daily_values(self, mode, data, title, column_date, plots):
         """
         Creates the plot with daily values and either shows it or returns the requested type of object
         - mode: indicates the type of return ('show', 'object', 'json')
@@ -267,7 +293,7 @@ class Covid19Manager():
         fig = go.Figure(data=data_plot).update_layout(
             title=title,
             legend=dict(orientation='h', yanchor="top", y=0.98, xanchor="right", x=0.99),
-            yaxis=dict( range=(data[p['column_value']], data[p['column_value']] * 1.2) )
+            yaxis=dict( range=(data[p['column_value']].min() if data[p['column_value']].min() < 0 else 0, data[p['column_value']].max() * 1.2) )
         )
 
         if mode == 'show':
@@ -363,58 +389,96 @@ if __name__ == '__main__':
 
     cov19 = Covid19Manager()
 
-    # read greece data
-    gre_data = cov19.get_greece_confirmed(mode='periferies')
-    gre_pop = cov19.get_greece_population(mode='periferies')
+    mode = 'greece_v1'
+    plots = ['daily_confirmed'] #'daily_confirmed', 'active_confirmed', 'epg', 'ia_rho']
 
-    # compute additional measures
-    gre_data['Confirmed_rollingmean'] = cov19.compute_rolling_mean(data=gre_data, value_column='Confirmed', groupby_column='Area', rolling_n=7)
-    gre_data['Confirmed_rollingsum'] = cov19.compute_rolling_sum(data=gre_data, value_column='Confirmed', groupby_column='Area', rolling_n=14)
-    gre_data['epg'] = cov19.compute_epg(gre_data, 'Confirmed', gre_pop[area])
+    if mode == 'greece_v1':
+        # read greece data
+        gre_data = cov19.get_greece_confirmed(mode='periferies')
+        gre_pop = cov19.get_greece_population(mode='periferies')
 
-    # select period
-    data = gre_data[(gre_data.Date >= start_date) & (gre_data.Date <= end_date)].sort_values('Date').reset_index(drop=True)
+        # compute additional measures
+        gre_data['Confirmed_rollingmean'] = cov19.compute_rolling_mean(data=gre_data, value_column='Confirmed', groupby_column='Area', rolling_n=7)
+        gre_data['Confirmed_rollingsum'] = cov19.compute_rolling_sum(data=gre_data, value_column='Confirmed', groupby_column='Area', rolling_n=14)
 
-    # select area
-    area = 'Ελλάδα'  # 'Περιφέρεια Ηπείρου' 'Ελλάδα' 'Περιφέρεια Κεντρικής Μακεδονίας'
-    area_data = data[data.Area == area].reset_index(drop=True)
+        # select period
+        data = gre_data[(gre_data.Date >= start_date) & (gre_data.Date <= end_date)].sort_values('Date').reset_index(drop=True)
 
-    # catalunya
-    # cat_data = cov19.get_catalunya_confirmed(mode='comarques')
-    # cat_pop = cov19.get_catalunya_population(mode='comarques')
-    #
-    # area = 'Barcelonès'
-    # data = cat_data[cat_data.Area == area].reset_index(drop = True)
-    # data['Confirmed_rollingmean'] = cov19.compute_rolling_mean(data, 'Confirmed', rolling_n=7)
-    # data['Confirmed_rollingsum'] = cov19.compute_rolling_sum(data, 'Confirmed', rolling_n=14)
-    # data['epg'] = cov19.compute_epg(data, 'Confirmed', cat_pop[area])
+        # select area
+        area = 'Περιφέρεια Ηπείρου'  # 'Περιφέρεια Ηπείρου' 'Ελλάδα' 'Περιφέρεια Κεντρικής Μακεδονίας'
+        area_data = data[data.Area == area].reset_index(drop=True)
+
+        area_data['epg'] = cov19.compute_epg(data=area_data, confirmed_column='Confirmed', population=gre_pop[area])
+
+    if mode == 'greece_v2':
+        # read greece data
+        gre_data = cov19.get_greece_confirmed(mode='periferies')
+        gre_pop = cov19.get_greece_population(mode='periferies')
+
+        # compute additional measures
+        gre_data['Confirmed_rollingmean'] = cov19.compute_rolling_mean(data=gre_data, value_column='Confirmed', groupby_column='Area', rolling_n=7)
+        gre_data['Confirmed_rollingsum'] = cov19.compute_rolling_sum(data=gre_data, value_column='Confirmed', groupby_column='Area', rolling_n=14)
+
+        # select period
+        data = gre_data[(gre_data.Date >= start_date) & (gre_data.Date <= end_date)].sort_values('Date').reset_index(drop=True)
+
+        # select area
+        area = 'Ελλάδα'  # 'Περιφέρεια Ηπείρου' 'Ελλάδα' 'Περιφέρεια Κεντρικής Μακεδονίας'
+        area_data = data[data.Area == area].reset_index(drop=True)
+
+        area_data['epg'] = cov19.compute_epg(data=area_data, confirmed_column='Confirmed', population=gre_pop[area])
+
+    if mode == 'cat':
+        # read greece data
+        cat_data = cov19.get_catalunya_confirmed(mode='comarques')
+        cat_pop = cov19.get_catalunya_population(mode='comarques')
+
+        # compute additional measures
+        cat_data['Confirmed_rollingmean'] = cov19.compute_rolling_mean(data=cat_data, value_column='Confirmed', groupby_column='Area', rolling_n=7)
+        cat_data['Confirmed_rollingsum'] = cov19.compute_rolling_sum(data=cat_data, value_column='Confirmed', groupby_column='Area', rolling_n=14)
+
+        # select period
+        data = cat_data[(cat_data.Date >= start_date) & (cat_data.Date <= end_date)].sort_values('Date').reset_index(drop=True)
+
+        # select area
+        area = 'Barcelonès'
+        area_data = data[data.Area == area].reset_index(drop=True)
+
+        area_data['epg'] = cov19.compute_epg(data=area_data, confirmed_column='Confirmed', population=cat_pop[area])
+
 
     # plots
-    # cov19.plot_daily_values_v2(mode='show', data=data, title='Daily Confirmed {}'.format(area), column_date='Date',
-    #                            plots=[
-    #                                {
-    #                                    'type': 'bar',
-    #                                    'column_value': 'Confirmed',
-    #                                    'name_value': 'Confirmed',
-    #                                    'color_value': 'lightskyblue'
-    #                                 },
-    #                                 {
-    #                                    'type': 'line',
-    #                                    'column_value': 'Confirmed_rollingmean',
-    #                                    'name_value': 'Mean {} days'.format(7),
-    #                                    'color_value': 'royalblue'
-    #                                 }
-    #                            ])
-    # cov19.plot_daily_values_v2(mode='show', data=data, title='Active Confirmed {}'.format(area), column_date='Date',
-    #                            plots=[
-    #                                {
-    #                                    'type': 'line',
-    #                                    'column_value': 'Confirmed_rollingsum',
-    #                                    'name_value': 'Sum {} days'.format(14),
-    #                                    'color_value': 'royalblue'
-    #                                }
-    #                            ])
-    # cov19.plot_epg(mode='show', data=data, title='Effective Potential Growth (EPG) {}'.format(area), column_date='Date')
-    cov19.plot_ia14_rho(mode='show', data=data, title='IA_14 vs RHO_7 {}'.format(area))
+    if 'daily_confirmed' in plots:
+        cov19.plot_daily_values(mode='show', data=area_data, title='Daily Confirmed {}'.format(area), column_date='Date',
+                                plots=[
+                                    {
+                                        'type': 'bar',
+                                        'column_value': 'Confirmed',
+                                        'name_value': 'Confirmed',
+                                        'color_value': 'lightskyblue'
+                                    },
+                                    {
+                                        'type': 'line',
+                                        'column_value': 'Confirmed_rollingmean',
+                                        'name_value': 'Mean {} days'.format(7),
+                                        'color_value': 'royalblue'
+                                    }
+                                ])
+    if 'active_confirmed' in plots:
+        cov19.plot_daily_values(mode='show', data=area_data, title='Active Confirmed {}'.format(area), column_date='Date',
+                                plots=[
+                                    {
+                                        'type': 'line',
+                                        'column_value': 'Confirmed_rollingsum',
+                                        'name_value': 'Sum {} days'.format(14),
+                                        'color_value': 'royalblue'
+                                    }
+                                ])
+
+    if 'epg' in plots:
+        cov19.plot_epg(mode='show', data=area_data, title='Effective Potential Growth (EPG) {}'.format(area), column_date='Date')
+
+    if 'ia14_rho' in plots:
+        cov19.plot_ia14_rho(mode='show', data=area_data, title='IA_14 vs RHO_7 {}'.format(area))
 
     exit()
