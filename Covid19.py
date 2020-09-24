@@ -127,7 +127,13 @@ class Covid19Manager():
             # return an empty dict
             pop = {}
 
-        return pop
+        # construct dataframe
+        pop_df = pd.DataFrame.from_dict(data=pop,
+                                        orient='index',
+                                        columns=['Population']
+                                        ).reset_index().rename(columns={'index': 'Area'})
+
+        return pop_df
 
     def get_greece_confirmed(self, mode, add_aggregate=True):
         """
@@ -207,7 +213,13 @@ class Covid19Manager():
             # return an empty dict
             pop = {}
 
-        return pop
+        # construct dataframe
+        pop_df = pd.DataFrame.from_dict(data=pop,
+                                        orient='index',
+                                        columns=['Population']
+                                        ).reset_index().rename(columns={'index': 'Area'})
+
+        return pop_df
 
     def compute_rolling_mean(self, data, value_column, groupby_column, rolling_n=7):
         """Returns the rolling mean with a 'rolling_n' window  of 'value_column' in 'data' grouping by column 'groupby_column'"""
@@ -240,12 +252,10 @@ class Covid19Manager():
 
         return data.epg.drop(columns=['rho_A', 'rho_B']).fillna(0)
 
-    def compute_epg_v2(self, data, confirmed_column, area_column, population):
-        """Returns the EPG (Effective Potential Growth) of 'data' where 'confirmed_column' is the column with daily confirmed values and .
-        'area_column' is the column with the areas.
+    def compute_epg_v2(self, data, confirmed_column, area_column):
+        """Returns the EPG (Effective Potential Growth) of 'data' where 'confirmed_column' is the column with daily confirmed values
+        and 'area_column' is the column with the areas.
         EPG as described in LINK? """
-
-        # loop groupby(area)'s and perform calculation
 
         # compute ratio of infected people per infected person
         # rho = rho_A / rho_B = (n + n-1 + n-2) / (n-5 + n-6 + n-7) (rho_7 is the average of the last 7 days)
@@ -257,8 +267,7 @@ class Covid19Manager():
 
         # compute number of potentially infectious people
         # ia_14 = sum of confirmed during last 14 days / 100.000 inhabitants
-        # TODO: how to deal with the population of the grouped area? merge original data and add population in each row?
-        data['ia_14'] = data[confirmed_column].rolling(window=14, min_periods=1).sum().reset_index(0, drop=True) / (population/100000)
+        data['ia_14'] = data.groupby(area_column)[confirmed_column].rolling(window=14, min_periods=1).sum().reset_index(0, drop=True) / (data.Population/100000)
 
         # compute index of potential growth (EPG)
         data['epg'] = data.rho_7 * data.ia_14
@@ -416,11 +425,12 @@ if __name__ == '__main__':
         # read greece data
         gre_data = cov19.get_greece_confirmed(mode='periferies')
         gre_pop = cov19.get_greece_population(mode='periferies')
+        gre_data = gre_data.merge(gre_pop, how='left', on='Area')
 
         # compute additional measures
         gre_data['Confirmed_rollingmean'] = cov19.compute_rolling_mean(data=gre_data, value_column='Confirmed', groupby_column='Area', rolling_n=7)
         gre_data['Confirmed_rollingsum'] = cov19.compute_rolling_sum(data=gre_data, value_column='Confirmed', groupby_column='Area', rolling_n=14)
-        gre_data['epg'] = cov19.compute_epg_v2(data=gre_data, confirmed_column='Confirmed', area_column='Area', population=None)
+        gre_data['epg'] = cov19.compute_epg_v2(data=gre_data, confirmed_column='Confirmed', area_column='Area')
 
         # select period
         data = gre_data[(gre_data.Date >= start_date) & (gre_data.Date <= end_date)].sort_values('Date').reset_index(drop=True)
@@ -442,7 +452,7 @@ if __name__ == '__main__':
         data = cat_data[(cat_data.Date >= start_date) & (cat_data.Date <= end_date)].sort_values('Date').reset_index(drop=True)
 
         # select area
-        area = 'Barcelonès'
+        area = 'Cerdanya'
         area_data = data[data.Area == area].reset_index(drop=True)
 
         area_data['epg'] = cov19.compute_epg(data=area_data, confirmed_column='Confirmed', population=cat_pop[area])
