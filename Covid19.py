@@ -8,8 +8,9 @@ Copyright 2020
 import pandas as pd
 import os
 from datetime import datetime, timedelta
-import plotly
+from plotly.utils import PlotlyJSONEncoder
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 import json
 
 class Covid19Manager():
@@ -251,7 +252,7 @@ class Covid19Manager():
         # rho = rho_A / rho_B = (n + n-1 + n-2) / (n-5 + n-6 + n-7) (rho_7 is the average of the last 7 days)
         data['rho_A'] = data.groupby(area_column)[confirmed_column].rolling(window=3, min_periods=1).sum().reset_index(0, drop=True)
         # data['rho_B'] = data.groupby(area_column)[confirmed_column].shift(5).rolling(window=3, min_periods=1).sum().reset_index(0, drop=True)
-        data['rho_B'] = data.groupby(area_column).shift(5).rho_A # rho_B is actually equal  to rho_A of 5 days earlier
+        data['rho_B'] = data.groupby(area_column).shift(4).rho_A # rho_B is actually equal to rho_A of 4 days earlier
         data['rho'] = data.apply(lambda d: d.rho_A / d.rho_B if (d.rho_B != 0 and not pd.isnull(d.rho_B)) else 0.0, axis=1)  # data.rho_A / data.rho_B if data.rho_B != 0 else 0.0
         data['rho_7'] = data.groupby(area_column).rho.rolling(window=7, min_periods=1).mean().reset_index(0, drop=True)
 
@@ -274,27 +275,32 @@ class Covid19Manager():
         - plots: array of dicts describing which plots to include
         """
 
+        # create plot figure
+        fig = make_subplots(specs=[[{"secondary_y": True}]])
+
         # add plots to plot
-        data_plot = []
+        min_value = max_value = 0
         for p in plots:
             if p['type'] == 'bar':
-                data_plot.append(go.Bar(
-                    name=p['name_value'],
-                    x=data[column_date], y=data[p['column_value']],
-                    marker_color=p['color_value']
-                ))
+                fig.add_trace(
+                    go.Bar(name=p['name_value'], x=data[column_date], y=data[p['column_value']], marker_color=p['color_value']),
+                    secondary_y=p['secondary_y'] if 'secondary_y' in p.keys() else False
+                )
             elif p['type'] == 'line':
-                data_plot.append(go.Scatter(
-                    name=p['name_value'],
-                    x=data[column_date], y=data[p['column_value']],
-                    marker_color=p['color_value']
-                ))
+                fig.add_trace(
+                    go.Scatter(name=p['name_value'], x=data[column_date], y=data[p['column_value']], marker_color=p['color_value']),
+                    secondary_y=p['secondary_y'] if 'secondary_y' in p.keys() else False
+                )
+
+            # set min-max to later set plot limits
+            min_value = data[p['column_value']].min() if data[p['column_value']].min() < min_value else min_value
+            max_value = data[p['column_value']].max() if data[p['column_value']].max() > max_value else max_value
 
         # plot daily data
-        fig = go.Figure(data=data_plot).update_layout(
+        fig.update_layout(
             title=title,
             legend=dict(orientation='h', yanchor="top", y=0.98, xanchor="right", x=0.99),
-            yaxis=dict( range=(data[p['column_value']].min() if data[p['column_value']].min() < 0 else 0, data[p['column_value']].max() * 1.2) )
+            yaxis=dict(range=(min_value, max_value * 1.2))
         )
 
         if mode == 'show':
@@ -302,7 +308,7 @@ class Covid19Manager():
         elif mode == 'object':
             return fig
         elif mode == 'json':
-            return json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
+            return json.dumps(fig, cls=PlotlyJSONEncoder)
 
     def plot_epg(self, mode, data, title, column_date):
         """
@@ -353,7 +359,7 @@ class Covid19Manager():
         elif mode == 'object':
             return fig
         elif mode == 'json':
-            return json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
+            return json.dumps(fig, cls=PlotlyJSONEncoder)
 
     def plot_ia14_rho(self, mode, data, title):
         """
@@ -380,5 +386,5 @@ class Covid19Manager():
         elif mode == 'object':
             return fig
         elif mode == 'json':
-            return json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
+            return json.dumps(fig, cls=PlotlyJSONEncoder)
 
