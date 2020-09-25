@@ -72,7 +72,6 @@ class Covid19Manager():
                     cat_cases['Area'] = 'Catalunya'
                     catdata_cases_areas = catdata_cases_areas.append(cat_cases).reset_index(drop=True)
 
-
                 # adding days with 0 confirmed cases (https://stackoverflow.com/questions/14856941/insert-0-values-for-missing-dates-within-multiindex)
                 df = catdata_cases_areas.copy()
                 all_dates = [df.Date.min() + timedelta(days=x) for x in range((df.Date.max()-df.Date.min()).days + 1)]
@@ -83,6 +82,9 @@ class Covid19Manager():
                 new_df = new_df.fillna(0).astype(int)
                 new_df = new_df.reset_index().rename(columns={'level_0': 'Date'})
                 data = new_df.copy()
+
+                # add group columm
+                data['Group'] = 'cat-comarques'
 
                 # store result into csv
                 data.to_csv(today_filename, sep=',', index=False, header=True)
@@ -164,9 +166,12 @@ class Covid19Manager():
                     gre_cases_total = gre_cases.groupby('Date').agg({'Confirmed': 'sum'}).reset_index()
                     gre_cases_total['Area'] = 'Ελλάδα'
                     gre_cases = gre_cases.append(gre_cases_total).reset_index(drop=True)
+                data = gre_cases
+
+                # add group columm
+                data['Group'] = 'gre-periferies'
 
                 # store result into csv
-                data = gre_cases
                 data.to_csv(today_filename, sep=',', index=False, header=True)
                 print('File {} stored'.format(today_filename))
 

@@ -5,14 +5,16 @@ Script that analyzes Greece & Catalunya COVID data
 Copyright 2020
 """
 
-# TODO: List or plot with cases per region last days (bar plot with regions as colors? only top-N regions?)
-# TODO: Plot ia14-rho7: add parameter to show only some values (1 of every N) to smooth the plot
-# TODO: Plot ia14-rho7: add date to hover
+# TODO: Add 'group' column to data (greece-periferies, cat-comarques, ...)
+# TODO: Plot with cases per region last days (bar plot with regions as colors? only top-N regions?)
+# TODO: Plot ia14-rho7: how to smooth the plot? rolling average? one point per week?
+# TODO: Plot ia14-rho7: add date to hover box
 # TODO: Plot ia14-rho7: add background colors
-# TODO: Add perfieries names in english?
+# TODO: Change perfieries names? Add perfieries names in english?
 # TODO: Keep data in Covid19 class object
 # TODO: Create Dashboard
 # TODO: Read deaths data
+# TODO: Compute and plot deathly_rate comparing deaths and confirmed cases
 # TODO: Implement other plots (log cumul cases, etc, ...)
 # TODO: Add world data
 
