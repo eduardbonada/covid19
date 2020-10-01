@@ -194,10 +194,6 @@ class Covid19Manager():
                                         ).reset_index().rename(columns={'index': 'Area'})
 
         return pop_df
-        """
-        Read Greece data at the level of 'periferies' and return a Dataframe with [Date, Area, Confirmed].
-        If add_aggregate is True, the aggregation values at Catalunya level are added
-        """
 
     def get_greece_nomoi_confirmed(self, add_aggregate=True):
         """
@@ -230,6 +226,11 @@ class Covid19Manager():
             # remove columns
             gre_cases = gre_cases.drop(columns=['date', 'total_confirmed'])
 
+            # update registers with unknown area
+            gre_cases.loc[gre_cases.Area == 'ΕΛΛΑΔΑ', 'Area'] = 'UNKNOWN'
+            gre_cases.loc[gre_cases.Area == 'ΕΛΛΑΔΑ', 'AreaParent'] = '-'
+            gre_cases.loc[gre_cases.Area == 'ΕΛΛΑΔΑ', 'AreaParent2'] = '-'
+
             # add greece as area
             if add_aggregate:
                 gre_cases_total = gre_cases.groupby('Date').agg({'Confirmed': 'sum'}).reset_index()
@@ -237,7 +238,66 @@ class Covid19Manager():
                 gre_cases_total['AreaParent'] = '-'
                 gre_cases_total['AreaParent2'] = '-'
                 gre_cases = gre_cases.append(gre_cases_total).reset_index(drop=True)
+
+            # fill nulls with 0
             data = gre_cases.fillna(0)
+
+            # add group columm
+            data['Group'] = 'gre-nomoi'
+
+            # store result into csv
+            data.to_csv(today_filename, sep=',', index=False, header=True)
+            print('File {} stored'.format(today_filename))
+
+        return data.sort_values(['Area', 'Date']).reset_index(drop=True)
+
+    def get_greece_nomoi_deaths(self, add_aggregate=True):
+        """
+        Read Greece data at the level of 'nomoi' and return a Dataframe with [Date, Area, Deaths].
+        If add_aggregate is True, the aggregation values at Greece level are added
+        """
+
+        # check if today's file already exists
+        today_filename = 'data/greece_deaths_nomoi_v{}.csv'.format(datetime.today().strftime('%Y%m%d'))
+        if os.path.exists(today_filename):
+            # read and return the file if it already exists
+            data = pd.read_csv(today_filename, sep=',').astype({'Date': 'datetime64[ns]'})
+        else:
+            # otherwise read and process from online source
+            greece_deaths_raw = pd.read_csv('https://raw.githubusercontent.com/iMEdD-Lab/open-data/master/COVID-19/greece_deaths_v2.csv')\
+                                .drop(columns=['8/27/20.1'])
+
+            # unpivot dataframe
+            gre_deaths = pd.melt(greece_deaths_raw.drop(columns=['county', 'pop_11']),
+                                 id_vars=['Γεωγραφικό Διαμέρισμα', 'Περιφέρεια', 'county_normalized'], var_name='date', value_name='total_deaths')
+
+            # rename columns
+            gre_deaths = gre_deaths.rename(columns={'county_normalized': 'Area', 'Γεωγραφικό Διαμέρισμα': 'AreaParent', 'Περιφέρεια': 'AreaParent2'})
+
+            # format Date
+            gre_deaths['Date'] = pd.to_datetime(gre_deaths['date'], format='%m/%d/%y')
+
+            # compute daily deaths
+            gre_deaths['Deaths'] = gre_deaths.total_deaths - gre_deaths.groupby('Area').total_deaths.shift(1)
+
+            # remove columns
+            gre_deaths = gre_deaths.drop(columns=['date', 'total_deaths'])
+
+            # update registers with unknown area
+            gre_deaths.loc[gre_deaths.Area == 'ΕΛΛΑΔΑ', 'Area'] = 'UNKNOWN'
+            gre_deaths.loc[gre_deaths.Area == 'ΕΛΛΑΔΑ', 'AreaParent'] = '-'
+            gre_deaths.loc[gre_deaths.Area == 'ΕΛΛΑΔΑ', 'AreaParent2'] = '-'
+
+            # add greece as area
+            if add_aggregate:
+                gre_deaths_total = gre_deaths.groupby('Date').agg({'Deaths': 'sum'}).reset_index()
+                gre_deaths_total['Area'] = 'ΕΛΛΑΔΑ'
+                gre_deaths_total['AreaParent'] = '-'
+                gre_deaths_total['AreaParent2'] = '-'
+                gre_deaths = gre_deaths.append(gre_deaths_total).reset_index(drop=True)
+
+            # fill nulls with 0
+            data = gre_deaths.fillna(0)
 
             # add group columm
             data['Group'] = 'gre-nomoi'
@@ -274,10 +334,6 @@ class Covid19Manager():
                                         ).reset_index().rename(columns={'index': 'Area'})
 
         return pop_df
-        """
-        Read Greece data at the level of 'periferies' and return a Dataframe with [Date, Area, Confirmed].
-        If add_aggregate is True, the aggregation values at Catalunya level are added
-        """
 
     def compute_rolling_mean(self, data, value_column, groupby_column, rolling_n=7):
         """Returns the rolling mean with a 'rolling_n' window  of 'value_column' in 'data' grouping by column 'groupby_column'"""

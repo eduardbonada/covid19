@@ -5,14 +5,14 @@ Script that analyzes Greece & Catalunya COVID data
 Copyright 2020
 """
 
-# TODO: Add Greece nomos (https://github.com/iMEdD-Lab/open-data/blob/master/COVID-19/greece_cases_v2.csv)
-# TODO: Compare periferies data from 2 sources
+# TODO: Update plot_daily_values to accept subplots
+# TODO: Create plot with daily confirmed on top and daily deaths below
 # TODO: Read deaths data cat-comarques
-# TODO: Read deaths data gre-periferies
-# TODO: Read deaths data gre-nomos
+# TODO: Compute deaths vs confirmed
 # TODO: Design dashboard
 # TODO: Implement missing plots
 # TODO: Create Dashboard
+# TODO: Recreate periferies from nomoi?
 # TODO: Plot ia14-rho7: how to smooth the plot? rolling average? one point per week?
 # TODO: Plot ia14-rho7: add date to hover box
 # TODO: Plot ia14-rho7: add background colors
@@ -31,30 +31,31 @@ import plotly.express as px
 
 
 # Config script
-start_date = '2020-06-01 00:00:00'
+start_date = '2020-08-01 00:00:00'
 end_date = '2020-12-31 00:00:00'
-plots_list = ['daily_detailed', 'daily_confirmed', 'active_confirmed', 'epg', 'ia14_rho7'] # ['top_areas', 'daily_detailed', 'daily_confirmed', 'active_confirmed', 'epg', 'ia14_rho7']
+plots_list = ['daily_confirmed', 'daily_deaths', 'epg'] # ['top_areas', 'daily_detailed', 'daily_confirmed', 'active_confirmed', 'epg', 'ia14_rho7', 'daily_deaths']
 
 # create covid manager object
 cov19 = Covid19.Covid19Manager()
 
 # read greece periferies data
-gre_periferies_data = cov19.get_greece_periferies_confirmed()
-gre_periferies_pop = cov19.get_greece_periferies_population()
-gre_periferies_data = gre_periferies_data.merge(gre_periferies_pop, how='left', on='Area')
+#gre_periferies_confirmed = cov19.get_greece_periferies_confirmed()
+#gre_periferies_pop = cov19.get_greece_periferies_population()
+#gre_periferies_confirmed = gre_periferies_data.merge(gre_periferies_pop, how='left', on='Area')
 
 # read greece nomoi data
-gre_nomoi_data = cov19.get_greece_nomoi_confirmed()
 gre_nomoi_pop = cov19.get_greece_nomoi_population()
-gre_nomoi_data = gre_nomoi_data.merge(gre_nomoi_pop, how='left', on='Area')
-gre_data = gre_periferies_data.append(gre_nomoi_data.drop(columns=['AreaParent', 'AreaParent2'])).reset_index(drop=True)
+gre_nomoi_confirmed = cov19.get_greece_nomoi_confirmed().merge(gre_nomoi_pop, how='left', on='Area')
+gre_nomoi_deaths = cov19.get_greece_nomoi_deaths().merge(gre_nomoi_pop, how='left', on='Area')
+gre_data = gre_nomoi_confirmed.merge(gre_nomoi_deaths[['Area','Date','Deaths']], how='left', left_on=['Area','Date'], right_on = ['Area','Date'])
+# gre_data = gre_periferies_data.append(gre_nomoi_data.drop(columns=['AreaParent', 'AreaParent2'])).reset_index(drop=True)
 
 # read cat comarques data
-cat_data = cov19.get_catalunya_comarques_confirmed()
 cat_pop = cov19.get_catalunya_comarques_population()
-cat_data = cat_data.merge(cat_pop, how='left', on='Area')
+cat_confirmed = cov19.get_catalunya_comarques_confirmed().merge(cat_pop, how='left', on='Area')
+cat_data = cat_confirmed
 
-# aggregate all data into single dataframe
+# aggregate all confirmed data
 data = gre_data.append(cat_data).reset_index(drop=True)
 
 # compute additional measures
@@ -69,6 +70,10 @@ data['Confirmed_rollingsum'] = cov19.compute_rolling_sum(data=data,
 data['epg'] = cov19.compute_epg_v2(data=data,
                                    confirmed_column='Confirmed',
                                    area_column='Area')
+data['Deaths_rollingmean'] = cov19.compute_rolling_mean(data=data,
+                                                        value_column='Deaths',
+                                                        groupby_column='Area',
+                                                        rolling_n=7)
 
 # select period
 data = data[(data.Date >= start_date) & (data.Date <= end_date)].sort_values(['Area', 'Date']).reset_index(drop=True)
@@ -76,7 +81,7 @@ data = data[(data.Date >= start_date) & (data.Date <= end_date)].sort_values(['A
 # select area
 # gre-periferies: 'Ελλάδα' 'Περιφέρεια Ηπείρου' 'Περιφέρεια Κεντρικής Μακεδονίας'
 # gre-nomoi: 'ΙΩΑΝΝΙΝΩΝ' 'ΘΕΣΠΡΩΤΙΑΣ' 'ΕΛΛΑΔΑ'
-area = 'ΘΕΣΣΑΛΟΝΙΚΗΣ'
+area = 'ΙΩΑΝΝΙΝΩΝ'
 area_data = data[data.Area == area].reset_index(drop=True)
 
 # plots
@@ -88,14 +93,21 @@ if 'daily_detailed' in plots_list:
         {'type': 'line', 'column_value': 'ia_14', 'name_value': 'ia_14', 'color_value': 'gold'},
         {'type': 'line', 'column_value': 'epg', 'name_value': 'epg', 'color_value': 'maroon'}
     ]
-    cov19.plot_daily_values(mode='show', data=area_data, title='Daily Detailed Data {}'.format(area), column_date='Date', plots=plots)
+    cov19.plot_daily_values(mode='show', data=area_data, title='Daily Details {}'.format(area), column_date='Date', plots=plots)
 
 if 'daily_confirmed' in plots_list:
     plots = [
         {'type': 'bar', 'column_value': 'Confirmed', 'name_value': 'Confirmed', 'color_value': 'lightskyblue'},
         {'type': 'line', 'column_value': 'Confirmed_rollingmean', 'name_value': 'Mean 7 days', 'color_value': 'royalblue'}
     ]
-    cov19.plot_daily_values(mode='show', data=area_data, title='Daily Detailed Data {}'.format(area), column_date='Date', plots=plots)
+    cov19.plot_daily_values(mode='show', data=area_data, title='Daily Confirmed {}'.format(area), column_date='Date', plots=plots)
+
+if 'daily_deaths' in plots_list:
+    plots = [
+        {'type': 'bar', 'column_value': 'Deaths', 'name_value': 'Deaths', 'color_value': 'lightcoral'},
+        {'type': 'line', 'column_value': 'Deaths_rollingmean', 'name_value': 'Mean 7 days', 'color_value': 'crimson'}
+    ]
+    cov19.plot_daily_values(mode='show', data=area_data, title='Daily Deaths {}'.format(area), column_date='Date', plots=plots)
 
 if 'active_confirmed' in plots_list:
     plots = [{'type': 'line', 'column_value': 'Confirmed_rollingsum', 'name_value': 'Sum {} days'.format(14), 'color_value': 'royalblue'}]
