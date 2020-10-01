@@ -120,7 +120,7 @@ class Covid19Manager():
     def get_greece_periferies_confirmed(self, add_aggregate=True):
         """
         Read Greece data at the level of 'periferies' and return a Dataframe with [Date, Area, Confirmed].
-        If add_aggregate is True, the aggregation values at Catalunya level are added
+        If add_aggregate is True, the aggregation values at Greece level are added
         """
 
         # check if today's file already exists
@@ -153,7 +153,7 @@ class Covid19Manager():
                 gre_cases_total = gre_cases.groupby('Date').agg({'Confirmed': 'sum'}).reset_index()
                 gre_cases_total['Area'] = 'Ελλάδα'
                 gre_cases = gre_cases.append(gre_cases_total).reset_index(drop=True)
-            data = gre_cases
+            data = gre_cases.fillna(0)
 
             # add group columm
             data['Group'] = 'gre-periferies'
@@ -185,6 +185,86 @@ class Covid19Manager():
                 'Περιφέρεια Πελοποννήσου': 577903,
                 'Περιφέρεια Στερεάς Ελλάδας και Εύβοιας': 547390,
                 'Ελλάδα': 10413243
+        }
+
+        # construct dataframe
+        pop_df = pd.DataFrame.from_dict(data=pop,
+                                        orient='index',
+                                        columns=['Population']
+                                        ).reset_index().rename(columns={'index': 'Area'})
+
+        return pop_df
+        """
+        Read Greece data at the level of 'periferies' and return a Dataframe with [Date, Area, Confirmed].
+        If add_aggregate is True, the aggregation values at Catalunya level are added
+        """
+
+    def get_greece_nomoi_confirmed(self, add_aggregate=True):
+        """
+        Read Greece data at the level of 'nomoi' and return a Dataframe with [Date, Area, Confirmed].
+        If add_aggregate is True, the aggregation values at Greece level are added
+        """
+
+        # check if today's file already exists
+        today_filename = 'data/greece_confirmed_nomoi_v{}.csv'.format(datetime.today().strftime('%Y%m%d'))
+        if os.path.exists(today_filename):
+            # read and return the file if it already exists
+            data = pd.read_csv(today_filename, sep=',').astype({'Date': 'datetime64[ns]'})
+        else:
+            # otherwise read and process from online source
+            greece_cases_raw = pd.read_csv('https://raw.githubusercontent.com/iMEdD-Lab/open-data/master/COVID-19/greece_cases_v2.csv')
+
+            # unpivot dataframe
+            gre_cases = pd.melt(greece_cases_raw.drop(columns=['county', 'pop_11']),
+                               id_vars=['Γεωγραφικό Διαμέρισμα', 'Περιφέρεια', 'county_normalized'], var_name='date', value_name='total_confirmed')
+
+            # rename columns
+            gre_cases = gre_cases.rename(columns={'county_normalized': 'Area', 'Γεωγραφικό Διαμέρισμα': 'AreaParent', 'Περιφέρεια': 'AreaParent2'})
+
+            # format Date
+            gre_cases['Date'] = pd.to_datetime(gre_cases['date'], format='%m/%d/%y')
+
+            # compute daily confirmed
+            gre_cases['Confirmed'] = gre_cases.total_confirmed - gre_cases.groupby('Area').total_confirmed.shift(1)
+
+            # remove columns
+            gre_cases = gre_cases.drop(columns=['date', 'total_confirmed'])
+
+            # add greece as area
+            if add_aggregate:
+                gre_cases_total = gre_cases.groupby('Date').agg({'Confirmed': 'sum'}).reset_index()
+                gre_cases_total['Area'] = 'ΕΛΛΑΔΑ'
+                gre_cases_total['AreaParent'] = '-'
+                gre_cases_total['AreaParent2'] = '-'
+                gre_cases = gre_cases.append(gre_cases_total).reset_index(drop=True)
+            data = gre_cases.fillna(0)
+
+            # add group columm
+            data['Group'] = 'gre-nomoi'
+
+            # store result into csv
+            data.to_csv(today_filename, sep=',', index=False, header=True)
+            print('File {} stored'.format(today_filename))
+
+        return data.sort_values(['Area', 'Date']).reset_index(drop=True)
+
+    def get_greece_nomoi_population(self):
+        """
+        Returns the population of Greece nomoi
+        """
+
+        pop = {
+            'ΑΓΙΟ ΟΡΟΣ': 1811, 'ΑΙΤΩΛΟΑΚΑΡΝΑΝΙΑΣ': 210802, 'ΑΡΓΟΛΙΔΑΣ': 97044, 'ΑΡΚΑΔΙΑΣ': 86685, 'ΑΡΤΑΣ': 67877,
+            'ΑΤΤΙΚΗΣ': 3828434, 'ΑΧΑΪΑΣ': 309694, 'ΒΟΙΩΤΙΑΣ': 117920, 'ΓΡΕΒΕΝΩΝ': 31757, 'ΔΡΑΜΑΣ': 98287,
+            'ΔΩΔΕΚΑΝΗΣΩΝ': 190988, 'ΕΒΡΟ': 147947, 'ΕΥΒΟΙΑΣ': 191206, 'ΕΥΡΥΤΑΝΙΑΣ': 20081, 'ΖΑΚΥΝΘΟΥ': 40759,
+            'ΗΛΕΙΑΣ': 159300, 'ΗΜΑΘΙΑΣ': 140611, 'ΗΡΑΚΛΕΙΟΥ': 305490, 'ΘΕΣΠΡΩΤΙΑΣ': 43587, 'ΘΕΣΣΑΛΟΝΙΚΗΣ': 1110551,
+            'ΙΩΑΝΝΙΝΩΝ': 167901, 'ΚΑΒΑΛΑΣ': 138687, 'ΚΑΡΔΙΤΣΑΣ': 113544, 'ΚΑΣΤΟΡΙΑΣ': 50322, 'ΚΕΡΚΥΡΑΣ': 104371,
+            'ΚΕΦΑΛΛΟΝΙΑΣ': 39032, 'ΚΙΛΚΙΣ': 80419, 'ΚΟΖΑΝΗΣ': 150196, 'ΚΟΡΙΝΘΟΥ': 145082, 'ΚΥΚΛΑΔΩΝ': 118027,
+            'ΛΑΚΩΝΙΑΣ': 89138, 'ΛΑΡΙΣΑΣ': 284325, 'ΛΑΣΙΘΙΟΥ': 75381, 'ΛΕΣΒΟΥ': 103698, 'ΛΕΥΚΑΔΑΣ': 23693,
+            'ΜΑΓΝΗΣΙΑΣ': 203808, 'ΜΕΣΣΗΝΙΑΣ': 159954, 'ΞΑΝΘΗΣ': 111222, 'ΠΕΛΛΑΣ': 139680, 'ΠΙΕΡΙΑΣ': 126698,
+            'ΠΡΕΒΕΖΑΣ': 57491, 'ΡΕΘΥΜΝΟΥ': 85609, 'ΡΟΔΟΠΗΣ': 112039, 'ΣΑΜΟΥ': 42859, 'ΣΕΡΡΩΝ': 176430,
+            'ΤΡΙΚΑΛΩΝ': 131085, 'ΦΘΙΩΤΙΔΑΣ': 158231, 'ΦΛΩΡΙΝΑΣ': 51414, 'ΦΩΚΙΔΑΣ': 40343, 'ΧΑΛΚΙΔΙΚΗΣ': 107719,
+            'ΧΑΝΙΩΝ': 156585, 'ΧΙΟΥ': 52674, 'ΕΛΛΑΔΑ': 10413243
         }
 
         # construct dataframe
@@ -249,8 +329,11 @@ class Covid19Manager():
 
         # compute index of potential growth (EPG)
         data['epg'] = data.rho_7 * data.ia_14
-        
-        return data.epg.drop(columns=['rho_A', 'rho_B']).fillna(0)
+
+        # drop columns
+        data = data.drop(columns=['rho_A', 'rho_B'])
+
+        return data.epg.fillna(0)
 
     def plot_daily_values(self, mode, data, title, column_date, plots):
         """
@@ -375,3 +458,8 @@ class Covid19Manager():
         elif mode == 'json':
             return json.dumps(fig, cls=PlotlyJSONEncoder)
 
+if __name__ == "__main__":
+    cov19 = Covid19Manager()
+
+    cov19.get_greece_nomoi_confirmed()
+    cov19.get_greece_nomoi_population()

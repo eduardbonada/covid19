@@ -5,8 +5,8 @@ Script that analyzes Greece & Catalunya COVID data
 Copyright 2020
 """
 
-# TODO: Refactor read data function names
 # TODO: Add Greece nomos (https://github.com/iMEdD-Lab/open-data/blob/master/COVID-19/greece_cases_v2.csv)
+# TODO: Compare periferies data from 2 sources
 # TODO: Read deaths data cat-comarques
 # TODO: Read deaths data gre-periferies
 # TODO: Read deaths data gre-nomos
@@ -39,9 +39,15 @@ plots_list = ['daily_detailed', 'daily_confirmed', 'active_confirmed', 'epg', 'i
 cov19 = Covid19.Covid19Manager()
 
 # read greece periferies data
-gre_data = cov19.get_greece_periferies_confirmed()
-gre_pop = cov19.get_greece_periferies_population()
-gre_data = gre_data.merge(gre_pop, how='left', on='Area')
+gre_periferies_data = cov19.get_greece_periferies_confirmed()
+gre_periferies_pop = cov19.get_greece_periferies_population()
+gre_periferies_data = gre_periferies_data.merge(gre_periferies_pop, how='left', on='Area')
+
+# read greece nomoi data
+gre_nomoi_data = cov19.get_greece_nomoi_confirmed()
+gre_nomoi_pop = cov19.get_greece_nomoi_population()
+gre_nomoi_data = gre_nomoi_data.merge(gre_nomoi_pop, how='left', on='Area')
+gre_data = gre_periferies_data.append(gre_nomoi_data.drop(columns=['AreaParent', 'AreaParent2'])).reset_index(drop=True)
 
 # read cat comarques data
 cat_data = cov19.get_catalunya_comarques_confirmed()
@@ -65,10 +71,12 @@ data['epg'] = cov19.compute_epg_v2(data=data,
                                    area_column='Area')
 
 # select period
-data = data[(data.Date >= start_date) & (data.Date <= end_date)].sort_values(['Area','Date']).reset_index(drop=True)
+data = data[(data.Date >= start_date) & (data.Date <= end_date)].sort_values(['Area', 'Date']).reset_index(drop=True)
 
 # select area
-area = 'Barcelonès'  # 'Περιφέρεια Ηπείρου' 'Ελλάδα' 'Περιφέρεια Κεντρικής Μακεδονίας'
+# gre-periferies: 'Ελλάδα' 'Περιφέρεια Ηπείρου' 'Περιφέρεια Κεντρικής Μακεδονίας'
+# gre-nomoi: 'ΙΩΑΝΝΙΝΩΝ' 'ΘΕΣΠΡΩΤΙΑΣ' 'ΕΛΛΑΔΑ'
+area = 'ΘΕΣΣΑΛΟΝΙΚΗΣ'
 area_data = data[data.Area == area].reset_index(drop=True)
 
 # plots
