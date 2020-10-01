@@ -37,7 +37,7 @@ class Covid19Manager():
             today_filename = 'data/catalunya_confirmed_{}_v{}.csv'.format(mode, datetime.today().strftime('%Y%m%d'))
             if os.path.exists(today_filename):
                 # read and return the file if it already exists
-                data = pd.read_csv(today_filename, sep=',')
+                data = pd.read_csv(today_filename, sep=',').astype({'Date': 'datetime64[ns]'})
             else:
                 # otherwise read and process from online source
 
@@ -140,7 +140,7 @@ class Covid19Manager():
             today_filename = 'data/greece_confirmed_{}_v{}.csv'.format(mode, datetime.today().strftime('%Y%m%d'))
             if os.path.exists(today_filename):
                 # read and return the file if it already exists
-                data = pd.read_csv(today_filename, sep=',')
+                data = pd.read_csv(today_filename, sep=',').astype({'Date': 'datetime64[ns]'})
             else:
                 # otherwise read and process from online source
                 greece_cases_raw = pd.read_csv('https://raw.githubusercontent.com/iMEdD-Lab/open-data/master/COVID-19/regions_greece_cases.csv')
