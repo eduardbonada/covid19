@@ -38,14 +38,14 @@ plots_list = ['daily_detailed', 'daily_confirmed', 'active_confirmed', 'epg', 'i
 # create covid manager object
 cov19 = Covid19.Covid19Manager()
 
-# read greece data
-gre_data = cov19.get_greece_confirmed(mode='periferies')
-gre_pop = cov19.get_greece_population(mode='periferies')
+# read greece periferies data
+gre_data = cov19.get_greece_periferies_confirmed()
+gre_pop = cov19.get_greece_periferies_population()
 gre_data = gre_data.merge(gre_pop, how='left', on='Area')
 
-# read cat data
-cat_data = cov19.get_catalunya_confirmed(mode='comarques')
-cat_pop = cov19.get_catalunya_population(mode='comarques')
+# read cat comarques data
+cat_data = cov19.get_catalunya_comarques_confirmed()
+cat_pop = cov19.get_catalunya_comarques_population()
 cat_data = cat_data.merge(cat_pop, how='left', on='Area')
 
 # aggregate all data into single dataframe
@@ -68,7 +68,7 @@ data['epg'] = cov19.compute_epg_v2(data=data,
 data = data[(data.Date >= start_date) & (data.Date <= end_date)].sort_values(['Area','Date']).reset_index(drop=True)
 
 # select area
-area = 'Περιφέρεια Ηπείρου'  # 'Περιφέρεια Ηπείρου' 'Ελλάδα' 'Περιφέρεια Κεντρικής Μακεδονίας'
+area = 'Barcelonès'  # 'Περιφέρεια Ηπείρου' 'Ελλάδα' 'Περιφέρεια Κεντρικής Μακεδονίας'
 area_data = data[data.Area == area].reset_index(drop=True)
 
 # plots
