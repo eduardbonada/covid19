@@ -5,25 +5,35 @@ Script that analyzes Greece & Catalunya COVID data
 Copyright 2020
 """
 
-# TODO: Add 'group' column to data (greece-periferies, cat-comarques, ...)
-# TODO: Plot with cases per region last days (bar plot with regions as colors? only top-N regions?)
+# TODO: Refactor read data function names
+# TODO: Add Greece nomos (https://github.com/iMEdD-Lab/open-data/blob/master/COVID-19/greece_cases_v2.csv)
+# TODO: Read deaths data cat-comarques
+# TODO: Read deaths data gre-periferies
+# TODO: Read deaths data gre-nomos
+# TODO: Design dashboard
+# TODO: Implement missing plots
+# TODO: Create Dashboard
 # TODO: Plot ia14-rho7: how to smooth the plot? rolling average? one point per week?
 # TODO: Plot ia14-rho7: add date to hover box
 # TODO: Plot ia14-rho7: add background colors
 # TODO: Change perfieries names? Add perfieries names in english?
 # TODO: Keep data in Covid19 class object
-# TODO: Create Dashboard
-# TODO: Read deaths data
 # TODO: Compute and plot deathly_rate comparing deaths and confirmed cases
 # TODO: Implement other plots (log cumul cases, etc, ...)
+# TODO: Add spanish ccaa data
 # TODO: Add world data
 
 import Covid19
+from datetime import datetime, timedelta
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+import plotly.express as px
+
 
 # Config script
 start_date = '2020-06-01 00:00:00'
 end_date = '2020-12-31 00:00:00'
-plots = ['daily_detailed'] # ['daily_detailed', 'daily_confirmed', 'active_confirmed', 'epg', 'ia14_rho7']
+plots_list = ['daily_detailed', 'daily_confirmed', 'active_confirmed', 'epg', 'ia14_rho7'] # ['top_areas', 'daily_detailed', 'daily_confirmed', 'active_confirmed', 'epg', 'ia14_rho7']
 
 # create covid manager object
 cov19 = Covid19.Covid19Manager()
@@ -58,11 +68,11 @@ data['epg'] = cov19.compute_epg_v2(data=data,
 data = data[(data.Date >= start_date) & (data.Date <= end_date)].sort_values(['Area','Date']).reset_index(drop=True)
 
 # select area
-area = 'Catalunya'  # 'Περιφέρεια Ηπείρου' 'Ελλάδα' 'Περιφέρεια Κεντρικής Μακεδονίας'
+area = 'Περιφέρεια Ηπείρου'  # 'Περιφέρεια Ηπείρου' 'Ελλάδα' 'Περιφέρεια Κεντρικής Μακεδονίας'
 area_data = data[data.Area == area].reset_index(drop=True)
 
 # plots
-if 'daily_detailed' in plots:
+if 'daily_detailed' in plots_list:
     plots = [
         {'type': 'bar', 'column_value': 'Confirmed', 'name_value': 'Confirmed', 'color_value': 'lightgray'},
         {'type': 'line', 'column_value': 'rho', 'name_value': 'rho', 'color_value': 'yellowgreen', 'secondary_y': True},
@@ -72,21 +82,40 @@ if 'daily_detailed' in plots:
     ]
     cov19.plot_daily_values(mode='show', data=area_data, title='Daily Detailed Data {}'.format(area), column_date='Date', plots=plots)
 
-if 'daily_confirmed' in plots:
+if 'daily_confirmed' in plots_list:
     plots = [
         {'type': 'bar', 'column_value': 'Confirmed', 'name_value': 'Confirmed', 'color_value': 'lightskyblue'},
         {'type': 'line', 'column_value': 'Confirmed_rollingmean', 'name_value': 'Mean 7 days', 'color_value': 'royalblue'}
     ]
     cov19.plot_daily_values(mode='show', data=area_data, title='Daily Detailed Data {}'.format(area), column_date='Date', plots=plots)
 
-if 'active_confirmed' in plots:
-    plots = {'type': 'line', 'column_value': 'Confirmed_rollingsum', 'name_value': 'Sum {} days'.format(14), 'color_value': 'royalblue'}
+if 'active_confirmed' in plots_list:
+    plots = [{'type': 'line', 'column_value': 'Confirmed_rollingsum', 'name_value': 'Sum {} days'.format(14), 'color_value': 'royalblue'}]
     cov19.plot_daily_values(mode='show', data=area_data, title='Active Confirmed {}'.format(area), column_date='Date', plots=plots)
 
-if 'epg' in plots:
+if 'epg' in plots_list:
     cov19.plot_epg(mode='show', data=area_data, title='Effective Potential Growth (EPG) {}'.format(area), column_date='Date')
 
-if 'ia14_rho7' in plots:
+if 'ia14_rho7' in plots_list:
     cov19.plot_ia14_rho(mode='show', data=area_data, title='IA_14 vs RHO_7 {}'.format(area))
+
+if 'top_areas' in plots_list:
+    group = 'cat-comarques'
+    last_n_days = 30
+
+    # select group & last n days
+    country_area = 'Ελλάδα' if group[:3] == 'gre' else ('Catalunya' if group[:3] == 'cat' else '?')
+    df = data[(data.Group == group) & (data.Date >= (datetime.today() - timedelta(days=last_n_days))) & (data.Area != country_area)]
+
+    # compute aggregated data per area (total_confirmed, total_confirmed_100k)
+    df_areas = df.groupby(['Area', 'Population', 'Date']).Confirmed.agg('sum').reset_index()
+    df_areas['Confirmed_100k'] = df_areas.Confirmed / (df_areas.Population/100000)
+
+    # select top-n areas
+    # select daily data from top-n areas from last n days
+
+    # plot stacked bars
+    px.bar(df_areas, x='Date', y='Confirmed_100k', color='Area', barmode='stack').show()
+
 
 exit()
