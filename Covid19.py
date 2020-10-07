@@ -208,7 +208,8 @@ class Covid19Manager():
             data = pd.read_csv(today_filename, sep=',').astype({'Date': 'datetime64[ns]'})
         else:
             # otherwise read and process from online source
-            greece_cases_raw = pd.read_csv('https://raw.githubusercontent.com/iMEdD-Lab/open-data/master/COVID-19/greece_cases_v2.csv')
+            greece_cases_raw = pd.read_csv('https://raw.githubusercontent.com/iMEdD-Lab/open-data/master/COVID-19/greece_cases_v2.csv')\
+                                .drop(columns='Unnamed: 0')
 
             # unpivot dataframe
             gre_cases = pd.melt(greece_cases_raw.drop(columns=['county', 'pop_11']),
