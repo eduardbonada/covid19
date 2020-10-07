@@ -88,8 +88,12 @@ plots_list = ['all_epgs_html']  # ['top_areas', 'daily_detailed', 'daily_confirm
 
 
 if 'all_epgs_html' in plots_list:
+
+    # select bottom-n areas
+    bottom_n_areas = data[(data.Group == 'gre-nomoi') & (data.Area != 'ΕΛΛΑΔΑ')][['Area', 'Date', 'epg']].groupby('Area').tail(1).sort_values('epg', ascending=False).head(100).Area.to_list()
+
     with open('epgs.html', 'w') as f:
-        for area in ['ΕΛΛΑΔΑ', 'ΙΩΑΝΝΙΝΩΝ', 'ΘΕΣΠΡΩΤΙΑΣ', 'ΑΤΤΙΚΗΣ', 'ΘΕΣΣΑΛΟΝΙΚΗΣ']:
+        for area in bottom_n_areas:
             area_data_tmp = data[data.Area == area].reset_index(drop=True)
             fig = cov19.plot_epg(mode='object', data=area_data_tmp, title='{}'.format(area), column_date='Date')
             f.write(fig.to_html(full_html=False, include_plotlyjs='cdn'))
