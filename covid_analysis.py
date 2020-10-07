@@ -33,7 +33,6 @@ import plotly.express as px
 # Config script
 start_date = '2020-08-01 00:00:00'
 end_date = '2020-12-31 00:00:00'
-plots_list = ['daily_confirmed', 'daily_deaths', 'epg'] # ['top_areas', 'daily_detailed', 'daily_confirmed', 'active_confirmed', 'epg', 'ia14_rho7', 'daily_deaths']
 
 # create covid manager object
 cov19 = Covid19.Covid19Manager()
@@ -80,11 +79,21 @@ data = data[(data.Date >= start_date) & (data.Date <= end_date)].sort_values(['A
 
 # select area
 # gre-periferies: 'Ελλάδα' 'Περιφέρεια Ηπείρου' 'Περιφέρεια Κεντρικής Μακεδονίας'
-# gre-nomoi: 'ΙΩΑΝΝΙΝΩΝ' 'ΘΕΣΠΡΩΤΙΑΣ' 'ΕΛΛΑΔΑ'
-area = 'ΙΩΑΝΝΙΝΩΝ'
+# gre-nomoi: 'ΙΩΑΝΝΙΝΩΝ' 'ΘΕΣΠΡΩΤΙΑΣ' 'ΕΛΛΑΔΑ' 'ΑΧΑΪΑΣ' 'ΑΤΤΙΚΗΣ' 'ΘΕΣΣΑΛΟΝΙΚΗΣ'
+area = 'ΘΕΣΣΑΛΟΝΙΚΗΣ'
 area_data = data[data.Area == area].reset_index(drop=True)
 
 # plots
+plots_list = ['all_epgs_html']  # ['top_areas', 'daily_detailed', 'daily_confirmed', 'active_confirmed', 'epg', 'ia14_rho7', 'daily_deaths']
+
+
+if 'all_epgs_html' in plots_list:
+    with open('epgs.html', 'w') as f:
+        for area in ['ΕΛΛΑΔΑ', 'ΙΩΑΝΝΙΝΩΝ', 'ΘΕΣΠΡΩΤΙΑΣ', 'ΑΤΤΙΚΗΣ', 'ΘΕΣΣΑΛΟΝΙΚΗΣ']:
+            area_data_tmp = data[data.Area == area].reset_index(drop=True)
+            fig = cov19.plot_epg(mode='object', data=area_data_tmp, title='{}'.format(area), column_date='Date')
+            f.write(fig.to_html(full_html=False, include_plotlyjs='cdn'))
+
 if 'daily_detailed' in plots_list:
     plots = [
         {'type': 'bar', 'column_value': 'Confirmed', 'name_value': 'Confirmed', 'color_value': 'lightgray'},
