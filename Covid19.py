@@ -475,7 +475,7 @@ class Covid19Manager():
                 ),
                 dict(
                     # add red area: very high risk 100<epg
-                    type="rect", xref="x", yref="y", x0="2020-01-01", y0=100, x1="2020-12-31", y1=10000,
+                    type="rect", xref="x", yref="y", x0="2020-01-01", y0=100, x1="2020-12-31", y1=50000,
                     fillcolor="red", opacity=0.5, layer="below", line_width=0
                 )
             ],
