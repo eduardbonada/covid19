@@ -12,6 +12,7 @@ from plotly.utils import PlotlyJSONEncoder
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import json
+from math import floor, ceil
 
 class Covid19Manager():
     """
@@ -499,16 +500,30 @@ class Covid19Manager():
         - the rest of variables are used to configure what to plot and how to visualize
         """
 
+        # setup arrays to print risk area limits
+        x = [x for x in range(0, 10000, 1)]
+        y_green = [(30/x if x != 0 else None) for x in x]
+        y_yellow = [(70/x if x != 0 else None) for x in x]
+        y_orange = [(100/x if x != 0 else None) for x in x]
+        y_red = [(10000/x if x != 0 else None) for x in x]
+
         # create plot
         fig = go.Figure(data=[
+            go.Scatter(name='green', x=x, y=y_green, marker_color='palegreen', fill='tonexty', line=dict(width=0), hoverinfo='none'),
+            go.Scatter(name='yellow', x=x, y=y_yellow, marker_color='yellow', fill='tonexty', line=dict(width=0), hoverinfo='none'),
+            go.Scatter(name='orange', x=x, y=y_orange, marker_color='orange', fill='tonexty', line=dict(width=0), hoverinfo='none'),
+            go.Scatter(name='red', x=x, y=y_red, marker_color='red', fill='tonexty', line=dict(width=0), hoverinfo='none'),
             go.Scatter(
                 name='IA_14 vs RHO_7',
                 x=data.ia_14, y=data.rho_7,
                 marker_color='darkslategray'
-            )
+            ),
         ]).update_layout(
             title=title,
-            width=800, height=800
+            width=800, height=800,
+            xaxis=dict(range=(data.ia_14.min() if data.ia_14.min() < 0 else 0, data.ia_14.max() * 1.2)),
+            yaxis=dict(range=(data.rho_7.min() if data.rho_7.min() < 0 else 0, data.rho_7.max() * 1.2)),
+            showlegend=False
         )
 
         if mode == 'show':
@@ -517,6 +532,8 @@ class Covid19Manager():
             return fig
         elif mode == 'json':
             return json.dumps(fig, cls=PlotlyJSONEncoder)
+
+
 
 if __name__ == "__main__":
     cov19 = Covid19Manager()
