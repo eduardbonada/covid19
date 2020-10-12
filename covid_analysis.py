@@ -15,7 +15,6 @@ Copyright 2020
 # TODO: Recreate periferies from nomoi?
 # TODO: Plot ia14-rho7: how to smooth the plot? rolling average? one point per week?
 # TODO: Plot ia14-rho7: add date to hover box
-# TODO: Plot ia14-rho7: add background colors
 # TODO: Change perfieries names? Add perfieries names in english?
 # TODO: Keep data in Covid19 class object
 # TODO: Compute and plot deathly_rate comparing deaths and confirmed cases
@@ -25,8 +24,6 @@ Copyright 2020
 
 import Covid19
 from datetime import datetime, timedelta
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 import plotly.express as px
 
 
