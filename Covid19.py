@@ -516,8 +516,11 @@ class Covid19Manager():
             go.Scatter(
                 name='IA_14 vs RHO_7',
                 x=data.ia_14, y=data.rho_7,
-                marker_color='darkslategray'
-            ),
+                marker=dict(color='darkslategray', size=5),
+                mode='lines + markers',
+                hoverinfo='none'
+                # text='data.Date'
+            )
         ]).update_layout(
             title=title,
             width=800, height=800,

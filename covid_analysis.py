@@ -13,6 +13,7 @@ Copyright 2020
 # TODO: Implement missing plots
 # TODO: Create Dashboard
 # TODO: Recreate periferies from nomoi?
+# TODO: Plot ia14-rho7: add markers to show where points are
 # TODO: Plot ia14-rho7: how to smooth the plot? rolling average? one point per week?
 # TODO: Plot ia14-rho7: add date to hover box
 # TODO: Change perfieries names? Add perfieries names in english?
@@ -74,26 +75,32 @@ data['Deaths_rollingmean'] = cov19.compute_rolling_mean(data=data,
 # select period
 data = data[(data.Date >= start_date) & (data.Date <= end_date)].sort_values(['Area', 'Date']).reset_index(drop=True)
 
+# plots
+plots_list = ['bottom_n_html']
+#plots_list = ['bottom_n_html', 'daily_confirmed', 'active_confirmed', 'epg', 'ia14_rho7', 'daily_deaths']
+
 # select area
 # gre-periferies: 'Ελλάδα' 'Περιφέρεια Ηπείρου' 'Περιφέρεια Κεντρικής Μακεδονίας'
 # gre-nomoi: 'ΙΩΑΝΝΙΝΩΝ' 'ΘΕΣΠΡΩΤΙΑΣ' 'ΕΛΛΑΔΑ' 'ΑΧΑΪΑΣ' 'ΑΤΤΙΚΗΣ' 'ΘΕΣΣΑΛΟΝΙΚΗΣ'
-area = 'ΘΕΣΣΑΛΟΝΙΚΗΣ'
+area = 'ΙΩΑΝΝΙΝΩΝ'
 area_data = data[data.Area == area].reset_index(drop=True)
 
-# plots
-plots_list = ['all_epgs_html']  # ['top_areas', 'daily_detailed', 'daily_confirmed', 'active_confirmed', 'epg', 'ia14_rho7', 'daily_deaths']
+if 'bottom_n_html' in plots_list:
 
+    # select bottom-n areas (greece)
+    bottom_n = 10
+    bottom_n_areas = data[(data.Group == 'gre-nomoi') & (data.Area != 'ΕΛΛΑΔΑ')][['Area', 'Date', 'epg']].groupby('Area').tail(1).sort_values('epg', ascending=False).head(bottom_n).Area.to_list()
 
-if 'all_epgs_html' in plots_list:
-
-    # select bottom-n areas
-    bottom_n_areas = data[(data.Group == 'gre-nomoi') & (data.Area != 'ΕΛΛΑΔΑ')][['Area', 'Date', 'epg']].groupby('Area').tail(1).sort_values('epg', ascending=False).head(100).Area.to_list()
+    # select bottom-n areas (cat)
+    #bottom_n_areas = data[(data.Group == 'cat-comarques') & (data.Area != 'Catalunya')][['Area', 'Date', 'epg']].groupby('Area').tail(1).sort_values('epg', ascending=False).head(10).Area.to_list()
 
     with open('epgs.html', 'w') as f:
-        for area in bottom_n_areas:
-            area_data_tmp = data[data.Area == area].reset_index(drop=True)
-            fig = cov19.plot_epg(mode='object', data=area_data_tmp, title='{}'.format(area), column_date='Date')
-            f.write(fig.to_html(full_html=False, include_plotlyjs='cdn'))
+        for a in bottom_n_areas:
+            area_data_tmp = data[data.Area == a].reset_index(drop=True)
+            #fig_epg = cov19.plot_epg(mode='object', data=area_data_tmp, title='{}'.format(a), column_date='Date')
+            #f.write(fig_epg.to_html(full_html=False, include_plotlyjs='cdn'))
+            fig_rho_ia14 = cov19.plot_ia14_rho(mode='object', data=area_data_tmp, title='{}'.format(a))
+            f.write(fig_rho_ia14.to_html(full_html=False, include_plotlyjs='cdn'))
 
 if 'daily_detailed' in plots_list:
     plots = [
