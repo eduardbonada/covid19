@@ -19,12 +19,12 @@ class Covid19Manager():
     Object that contains actions and processes related to Covid19 data sources
     """
 
-    def __init__(self):
+    def __init__(self, run_in_local):
         """
         Initialize
         """
         
-        # self.test = test
+        self.run_in_local = run_in_local
 
     def get_catalunya_comarques_confirmed(self, add_aggregate=True):
         """
@@ -34,6 +34,8 @@ class Covid19Manager():
 
         # check if today's file already exists
         today_filename = 'data/catalunya_confirmed_comarques_v{}.csv'.format(datetime.today().strftime('%Y%m%d'))
+        if not self.run_in_local:
+            today_filename = '/home/ec2-user/covid/' + today_filename
         if os.path.exists(today_filename):
             # read and return the file if it already exists
             data = pd.read_csv(today_filename, sep=',').astype({'Date': 'datetime64[ns]'})
@@ -54,16 +56,16 @@ class Covid19Manager():
             # remove character '\xa0' from Areas
             catdata_cases['Area'] = catdata_cases.Area.str.replace('\xa0', '')
 
-            print('Read data from Catalunya: {} registers from {} to {}'.format(len(catdata_cases), min(catdata_cases.Date), max(catdata_cases.Date)))
+            # print('Read data from Catalunya: {} registers from {} to {}'.format(len(catdata_cases), min(catdata_cases.Date), max(catdata_cases.Date)))
 
             # filter by type pf case: 'Epidemiològic', 'Positiu PCR', 'Positiu per ELISA', 'Positiu per Test Ràpid', 'Sospitós'
             types = ['Epidemiològic', 'Positiu PCR', 'Positiu per ELISA', 'Positiu per Test Ràpid']
             catdata_cases = catdata_cases[catdata_cases.Type.isin(types)].drop(columns='Type')
-            print('Filtering by type: {} registers'.format(len(catdata_cases)))
+            # print('Filtering by type: {} registers'.format(len(catdata_cases)))
 
             # aggregate areas
             catdata_cases_areas = catdata_cases.groupby(['Date', 'Area']).sum().reset_index()
-            print('Aggregate by areas: {} confirmed cases from {} areas'.format(catdata_cases_areas.Confirmed.sum(), catdata_cases_areas.Area.nunique()))
+            # print('Aggregate by areas: {} confirmed cases from {} areas'.format(catdata_cases_areas.Confirmed.sum(), catdata_cases_areas.Area.nunique()))
 
             # add Catalunya as area
             if add_aggregate:
@@ -126,6 +128,8 @@ class Covid19Manager():
 
         # check if today's file already exists
         today_filename = 'data/greece_confirmed_periferies_v{}.csv'.format(datetime.today().strftime('%Y%m%d'))
+        if not self.run_in_local:
+            today_filename = '/home/ec2-user/covid/' + today_filename
         if os.path.exists(today_filename):
             # read and return the file if it already exists
             data = pd.read_csv(today_filename, sep=',').astype({'Date': 'datetime64[ns]'})
@@ -204,6 +208,8 @@ class Covid19Manager():
 
         # check if today's file already exists
         today_filename = 'data/greece_confirmed_nomoi_v{}.csv'.format(datetime.today().strftime('%Y%m%d'))
+        if not self.run_in_local:
+            today_filename = '/home/ec2-user/covid/' + today_filename
         if os.path.exists(today_filename):
             # read and return the file if it already exists
             data = pd.read_csv(today_filename, sep=',').astype({'Date': 'datetime64[ns]'})
@@ -264,13 +270,15 @@ class Covid19Manager():
 
         # check if today's file already exists
         today_filename = 'data/greece_deaths_nomoi_v{}.csv'.format(datetime.today().strftime('%Y%m%d'))
+        if not self.run_in_local:
+            today_filename = '/home/ec2-user/covid/' + today_filename
         if os.path.exists(today_filename):
             # read and return the file if it already exists
             data = pd.read_csv(today_filename, sep=',').astype({'Date': 'datetime64[ns]'})
         else:
             # otherwise read and process from online source
-            greece_deaths_raw = pd.read_csv('https://raw.githubusercontent.com/iMEdD-Lab/open-data/master/COVID-19/greece_deaths_v2.csv')\
-                                .drop(columns=['8/27/20.1'])
+            greece_deaths_raw = pd.read_csv('https://raw.githubusercontent.com/iMEdD-Lab/open-data/master/COVID-19/greece_deaths_v2.csv')#\
+                                #.drop(columns=['8/27/20.1'])
 
             # unpivot dataframe
             gre_deaths = pd.melt(greece_deaths_raw.drop(columns=['county', 'pop_11']),
@@ -280,6 +288,7 @@ class Covid19Manager():
             gre_deaths = gre_deaths.rename(columns={'county_normalized': 'Area', 'Γεωγραφικό Διαμέρισμα': 'AreaParent', 'Περιφέρεια': 'AreaParent2'})
 
             # format Date
+            gre_deaths = gre_deaths[~gre_deaths.date.str.contains('21.1')]
             gre_deaths['Date'] = pd.to_datetime(gre_deaths['date'], format='%m/%d/%y')
 
             # compute daily deaths
@@ -461,23 +470,28 @@ class Covid19Manager():
             shapes=[
                 dict(
                     # add green area: low risk epg<30
-                    type="rect", xref="x", yref="y", x0="2020-01-01", y0=0, x1="2020-12-31", y1=30,
+                    type="rect", xref="x", yref="y", x0="2020-01-01", y0=0, x1="2021-12-31", y1=30,
                     fillcolor="palegreen", opacity=0.5, layer="below", line_width=0
                 ),
                 dict(
                     # add yellow area: moderate risk 30<epg<70
-                    type="rect", xref="x", yref="y", x0="2020-01-01", y0=30, x1="2020-12-31", y1=70,
+                    type="rect", xref="x", yref="y", x0="2020-01-01", y0=30, x1="2021-12-31", y1=70,
                     fillcolor="yellow", opacity=0.4, layer="below", line_width=0
                 ),
                 dict(
                     # add orange area: high risk 70<epg<100
-                    type="rect", xref="x", yref="y", x0="2020-01-01", y0=70, x1="2020-12-31", y1=100,
+                    type="rect", xref="x", yref="y", x0="2020-01-01", y0=70, x1="2021-12-31", y1=100,
                     fillcolor="orange", opacity=0.4, layer="below", line_width=0
                 ),
                 dict(
                     # add red area: very high risk 100<epg
-                    type="rect", xref="x", yref="y", x0="2020-01-01", y0=100, x1="2020-12-31", y1=50000,
+                    type="rect", xref="x", yref="y", x0="2020-01-01", y0=100, x1="2021-12-31", y1=200,
                     fillcolor="red", opacity=0.5, layer="below", line_width=0
+                ),
+                dict(
+                    # add red area: very high risk 100<epg
+                    type="rect", xref="x", yref="y", x0="2020-01-01", y0=200, x1="2021-12-31", y1=50000,
+                    fillcolor="darkred", opacity=0.5, layer="below", line_width=0
                 )
             ],
             yaxis=dict(
@@ -505,7 +519,8 @@ class Covid19Manager():
         y_green = [(30/x if x != 0 else None) for x in x]
         y_yellow = [(70/x if x != 0 else None) for x in x]
         y_orange = [(100/x if x != 0 else None) for x in x]
-        y_red = [(10000/x if x != 0 else None) for x in x]
+        y_red = [(200/x if x != 0 else None) for x in x]
+        y_dark_red = [(10000/x if x != 0 else None) for x in x]
 
         # create plot
         fig = go.Figure(data=[
@@ -513,6 +528,7 @@ class Covid19Manager():
             go.Scatter(name='yellow', x=x, y=y_yellow, marker_color='yellow', fill='tonexty', line=dict(width=0), hoverinfo='none'),
             go.Scatter(name='orange', x=x, y=y_orange, marker_color='orange', fill='tonexty', line=dict(width=0), hoverinfo='none'),
             go.Scatter(name='red', x=x, y=y_red, marker_color='red', fill='tonexty', line=dict(width=0), hoverinfo='none'),
+            go.Scatter(name='darkred', x=x, y=y_dark_red, marker_color='darkred', fill='tonexty', line=dict(width=0), hoverinfo='none'),
             go.Scatter(
                 name='IA_14 vs RHO_7',
                 x=data.ia_14, y=data.rho_7,
@@ -520,6 +536,13 @@ class Covid19Manager():
                 mode='lines + markers',
                 hoverinfo='none'
                 # text='data.Date'
+            ),
+            go.Scatter(
+                name='Last',
+                x=data.sort_values('Date').tail(1).ia_14, y=data.sort_values('Date').tail(1).rho_7,
+                marker=dict(color='darkslategray', size=15),
+                mode='lines + markers',
+                hoverinfo='none'
             )
         ]).update_layout(
             title=title,
